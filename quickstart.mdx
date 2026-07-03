@@ -1,47 +1,242 @@
 ---
-title: "Quickstart"
-description: "Begin with a guide on the fastest path to a successful outcome"
+title: "Get Started with Forge in Under 5 Minutes"
+sidebarTitle: "Quickstart"
+description: "Initialize Forge on a backend project, run your first architecture audit, scaffold a feature slice, and enforce dependency rules in five steps."
 ---
 
-Describe how someone begins using your product. What is the first thing they need to do? Are there any prerequisites?
+By the end of this guide you will have: Forge installed in your AI agent, your backend project initialized with the four-domain architecture model, a first audit score with a breakdown of violations by category, a complete Hexagonal Architecture feature slice scaffolded from templates, and all 13 dependency rules validated against your codebase. Everything here works on any Node.js backend project — existing codebases, greenfield projects, or anything in between.
 
-A quickstart should take someone from zero to using your product. They'll get a quick win and a sense of what they can accomplish.
-
-## Prerequisites
-
-Before you begin, you must have:
-
-- Requirement one (for example, Node.js 18+, a free account, an API key)
-- Requirement two (for example, a compatible device, a compatible browser, a compatible operating system)
-
-## Get started
+---
 
 <Steps>
-  <Step title="Install">
-    Describe how to install your product or sign up.
+
+  <Step title="Install Forge">
+    Run the interactive installer from your project root. It detects which AI agents you have installed and walks you through choosing one or more to configure.
 
     ```bash
-    npm install your-package
+    npx @ronaldjdevfs/forge install
     ```
+
+    The wizard will copy the skill runtime into your agent's directory, configure the appropriate hook, and generate slash commands. See the [Installation guide](/installation) for agent-specific flags and global install options.
   </Step>
-  <Step title="Configure">
-    Describe any setup or configuration needed before first use.
+
+  <Step title="Initialize your project">
+    Open a session with your agent in the project directory and type any of the following trigger phrases:
+
+    ```
+    inicializar
+    ```
+
+    ```
+    forge
+    ```
+
+    ```
+    setup
+    ```
+
+    Your agent will execute the **boot sequence** — a mandatory 9-step chain that runs before any Forge operation:
+
+    ```
+    Boot sequence: context → armorer → profile → graph → chain → inspect → architecture → execute → architecture
+    ```
+
+    Each step builds on the previous:
+    - **context** — scans your project: detects the framework, database, ORM, DI strategy, existing directories, and overall structure
+    - **armorer** — analyzes ownership: finds orphaned files, duplicates, and misplaced components
+    - **profile** — matches the detected stack against one of 10 predefined technology profiles (Express, Fastify, NestJS × MongoDB/PostgreSQL/Prisma/Drizzle), or synthesizes a generic profile
+    - **graph** — builds the architecture graph: all nodes (platform, feature, shared, infra, domain, adapter), all directed dependency edges, and all rule violations
+    - **chain** — constructs the multi-layer dependency graph with topological sort and cycle detection
+    - **inspect** — runs the full audit and computes the 0–100 architecture score
+    - **architecture** — generates or updates `ARCHITECTURE.md` with the current state
+
+    If `src/platform/`, `src/shared/`, or `src/infra/` are missing, Forge bootstraps them automatically using templates for the detected profile.
+  </Step>
+
+  <Step title="Run your first audit">
+    Ask your agent to run a full architecture audit:
+
+    ```
+    inspeccionar
+    ```
+
+    or
+
+    ```
+    inspect
+    ```
+
+    You can also run it directly from the command line:
 
     ```bash
-    your-cli init
+    node .opencode/skills/forge/scripts/inspect.mjs --json
     ```
+
+    The output includes an overall score from 0–100 with a letter grade (A–F), plus a per-category breakdown. A typical JSON result looks like this:
+
+    ```json
+    {
+      "score": 74,
+      "grade": "C",
+      "maxScore": 100,
+      "categories": {
+        "structure":    { "score": 28, "max": 30, "violations": 1 },
+        "layers":       { "score": 20, "max": 25, "violations": 2 },
+        "decorators":   { "score": 20, "max": 20, "violations": 0 },
+        "ownership":    { "score": 15, "max": 20, "violations": 3 },
+        "platform":     { "score": 12, "max": 15, "violations": 1 },
+        "dependencies": { "score": 10, "max": 15, "violations": 4 },
+        "graph":        { "score": 18, "max": 20, "violations": 1 },
+        "customRules":  { "score":  5, "max":  5, "violations": 0 },
+        "naming":       { "score":  8, "max": 10, "violations": 2 },
+        "importConventions": { "score": 14, "max": 20, "violations": 3 }
+      },
+      "violations": [
+        { "rule": "R1", "severity": "CRITICAL", "file": "src/features/auth/application/use-cases/Login.uc.ts", "message": "feature → infra import detected" }
+      ]
+    }
+    ```
+
+    The audit evaluates 10 categories against a total of 180 raw points, which are then normalized to a 0–100 scale.
+
+    <Tip>
+      Run `inspect` without `--json` for a color-coded terminal report with violation details, fix suggestions, and a score bar. Use `--severity=CRITICAL` to filter to only the most severe issues first.
+    </Tip>
   </Step>
-  <Step title="Run it">
-    Show the first thing a user does to see it working.
+
+  <Step title="Scaffold a feature">
+    Ask your agent to create a new feature:
+
+    ```
+    crear feature users
+    ```
+
+    or instruct it to run:
+
+    ```
+    cast users
+    ```
+
+    Forge generates the full Hexagonal Architecture vertical slice — all directories and all files — using TypeScript templates for the detected profile:
+
+    ```
+    src/features/users/
+    ├── domain/
+    │   ├── entities/
+    │   │   └── User.entity.ts
+    │   ├── repositories/
+    │   │   └── IUser.repository.ts
+    │   ├── errors/
+    │   │   └── UserNotFound.error.ts
+    │   └── events/
+    │       └── UserCreated.event.ts
+    ├── application/
+    │   ├── use-cases/
+    │   │   └── CreateUser.uc.ts
+    │   └── mappers/
+    │       └── User.mapper.ts
+    └── adapters/
+        ├── in/http/
+        │   ├── User.controller.ts
+        │   └── User.routes.ts
+        └── out/persistence/
+            ├── User.repository.ts
+            └── User.schema.ts
+    ```
+
+    Before creating the feature, `cast` verifies that `src/platform/`, `src/shared/`, and `src/infra/` exist. If any are missing, it bootstraps them first using the active technology profile.
+
+    After scaffolding, your agent will run a Post-Cast Checklist:
+    1. **Entity Discovery** — checks whether the entity already exists in `platform/domain/entities/` and should be shared instead of duplicated
+    2. **DI Wiring** — creates `di.ts` with the correct container registration for your DI strategy
+    3. **Tests** — creates `__tests__/CreateUser.test.ts` from the test template
+    4. **Import Validation** — verifies R10 (no bare specifiers), R11 (no `.ts` extensions), R12 (no `bootstrap.di.js` imports)
+  </Step>
+
+  <Step title="Validate rules">
+    Run the rule validator to check all 13 dependency rules across your entire codebase:
 
     ```bash
-    your-cli start
+    forge quench
     ```
+
+    or ask your agent:
+
+    ```
+    verificar
+    ```
+
+    `quench` runs `scripts/detect.mjs` and reports every violation with its rule number, severity, file path, and a description. Violations are grouped by severity: CRITICAL → ERROR → WARNING.
+
+    ```
+    ✖ R1  CRITICAL  src/features/auth/application/use-cases/Login.uc.ts
+          feature → infra import: import { PrismaClient } from '../../infra/prisma/client'
+
+    ✖ R8  ERROR     src/features/payments/adapters/in/http/Payment.controller.ts
+          Cross-feature direct import: import { User } from '../users/domain/entities/User.entity'
+
+    ⚠ R11 WARNING   src/features/users/adapters/in/http/User.routes.ts
+          .ts extension in import: import { UserController } from './User.controller.ts'
+    ```
+
+    To auto-fix WARNING-level violations:
+
+    ```bash
+    forge quench --fix
+    ```
+
+    `--fix` corrects issues like missing `@injectable()` decorators, `.ts` extensions that should be `.js`, naming convention violations, and missing `reflect-metadata` imports — without touching your business logic.
+
+    To list all inline rule suppressions in the codebase:
+
+    ```bash
+    forge quench --show-ignores
+    ```
+
+    <Note>
+      Rules R1–R9 govern cross-layer and cross-feature dependency direction. Rules R10–R12 govern ESM import conventions (bare specifiers, file extensions, DI bootstrap imports). Rule R13 detects domain artifacts (entities, use cases, mappers, ports) placed inside `src/platform/`, which is reserved for technical backbone code only.
+    </Note>
   </Step>
+
 </Steps>
 
-<Tip>
-  Give people a way to get help. This could be a link to a support page, a chat with a customer support agent, or a forum for your product.
+---
 
-  Example: Need help? Reach out to us at [support@yourcompany.com](mailto:support@yourcompany.com).
-</Tip>
+## Natural Language Commands
+
+Forge is designed to be driven by natural language in your agent. The following phrases map to specific Forge commands and can be used in any session where the skill is loaded.
+
+| Natural Language | Command | Description |
+|-----------------|---------|-------------|
+| "inicializar", "setup", "empezar" | `forge` | Initialize project: detect stack, bootstrap layers, create `ARCHITECTURE.md` |
+| "crear feature \<name\>", "nuevo dominio" | `cast` | Scaffold a complete Hexagonal Architecture feature slice |
+| "inspeccionar", "diagnóstico", "evaluar" | `inspect` | Full architecture audit: 10 categories, 0–100 score, grade A–F |
+| "verificar", "quench", "checklist" | `quench` | Validate all 13 dependency rules with optional `--fix` |
+| "cadena", "grafo", "acoplamiento" | `chain` | Build multi-layer dependency graph with topological sort and cycle detection |
+| "inscribir", "grabar", "ARCHITECTURE.md" | `inscribe` | Generate or update `ARCHITECTURE.md` with current metrics and violations |
+| "trasladar", "mover" | `relocate` | Migrate legacy code to the correct architectural layer |
+| "refactorizar", "rediseñar" | `reforge` | Restructure features or multi-layer components |
+| "templar", "endurecer" | `temper` | Apply constructor injection and remove service locators |
+| "fundir", "compartir", "mover a shared" | `smelt` | Extract pure cross-cutting code to `src/shared/` |
+| "examinar", "calidad", "opinión" | `assay` | Multi-persona architecture review (Bezos, Fowler, Hacker, PM, Senior Architect) |
+| "estado", "último audit" | `forge state --show` | Show last audit score, grade, and violations |
+| "hook", "pre-commit" | `forge hook` | Manage git pre-commit hook that validates architecture on every commit |
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture Model" icon="diagram-project" href="/architecture/overview">
+    Deep-dive into the four-domain model, all 13 dependency rules (R1–R13) with severities, naming conventions, and the technology profiles Forge supports.
+  </Card>
+  <Card title="Commands Reference" icon="terminal" href="/commands/forge">
+    Full reference for every Forge command — `forge`, `cast`, `inspect`, `quench`, `chain`, `inscribe`, `relocate`, `reforge`, `temper`, `smelt`, `assay`, and more.
+  </Card>
+  <Card title="Agent Integration" icon="robot" href="/agents/overview">
+    Understand how `forgeSentinel` (PostToolUse) and `forgeSmith` (preToolUse) work, how to configure hooks per agent, and how to manage inline ignores for deliberate exceptions.
+  </Card>
+  <Card title="Concepts" icon="book" href="/introduction">
+    Review the foundational concepts behind Forge: Hexagonal Architecture, Pragmatic DDD, Vertical Slices, the architecture graph as source of truth, and the boot sequence model.
+  </Card>
+</CardGroup>

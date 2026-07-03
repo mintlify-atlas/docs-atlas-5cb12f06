@@ -1,0 +1,99 @@
+{
+  "projectType": "cli-tool",
+  "projectName": "Forge",
+  "projectDescription": "Architecture governance CLI and AI agent skill that enforces Hexagonal Architecture, Pragmatic DDD, and Vertical Slices for backend systems via automated auditing, scaffolding, and dependency rule validation.",
+  "theme": "aspen",
+  "primaryColor": "#E85D04",
+  "lightColor": "#FFF3E0",
+  "darkColor": "#7C2D12",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Architecture Model",
+            "pages": [
+              "architecture/overview",
+              "architecture/layers",
+              "architecture/dependency-rules",
+              "architecture/naming-conventions"
+            ]
+          },
+          {
+            "group": "Commands",
+            "pages": [
+              "commands/forge",
+              "commands/cast",
+              "commands/inspect",
+              "commands/quench",
+              "commands/chain",
+              "commands/inscribe",
+              "commands/assay",
+              "commands/smelt",
+              "commands/temper",
+              "commands/relocate-reforge",
+              "commands/utilities"
+            ]
+          },
+          {
+            "group": "Agent Integration",
+            "pages": [
+              "agents/overview",
+              "agents/hooks",
+              "agents/profiles"
+            ]
+          },
+          {
+            "group": "Concepts",
+            "pages": [
+              "concepts/principles",
+              "concepts/patterns",
+              "concepts/di-strategies"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Four-layer architecture model: Platform, Features, Shared, Infra",
+    "13 architectural rules (R1-R13) with CRITICAL/ERROR/WARNING severity",
+    "Architecture scoring system: 180 points across 10 categories, normalized to 0-100 with A-F grades",
+    "Automatic ownership detection: orphans, duplicates, misplaced components",
+    "Multi-agent support: OpenCode, Claude Code, Cursor, Codex CLI, Gemini",
+    "forgeSentinel PostToolUse hook and forgeSmith preToolUse gate for real-time enforcement",
+    "10 pre-built technology profiles (Express, Fastify, NestJS × MongoDB, PostgreSQL, Prisma, Drizzle)",
+    "Living ARCHITECTURE.md auto-generated and updated after every operation",
+    "Feature scaffolding with 19 TypeScript templates following hexagonal structure",
+    "Multi-persona architectural review (Bezos, Fowler, Hacker, PM, Architect)"
+  ],
+  "publicApiSurface": [
+    "forge (init/boot sequence)",
+    "cast <name>",
+    "inspect [--json]",
+    "quench [--fix] [--show-ignores]",
+    "chain [--json]",
+    "inscribe",
+    "assay [--persona=bezos|fowler|hacker|pm|senior] [--save] [--json]",
+    "smelt",
+    "temper",
+    "relocate",
+    "reforge",
+    "nail <path>",
+    "unnail <name>",
+    "forge state [--show] [--json] [--history]",
+    "forge hook install|status|check|uninstall",
+    "forge rollback [--list] [--id <checkpoint>]",
+    "forge update",
+    "forge install [--all|--cursor|--claude|--codex|--gemini|--opencode|--global]"
+  ]
+}

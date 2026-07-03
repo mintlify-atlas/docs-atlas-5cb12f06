@@ -1,0 +1,168 @@
+---
+title: "Forge as an AI Agent Skill: Multi-Agent Architecture"
+sidebarTitle: "Overview"
+description: "Forge deploys as a skill into five AI coding agents simultaneously — OpenCode, Claude Code, Cursor, Codex CLI, and Gemini — with hooks tailored to each platform's extension model."
+---
+
+Forge is not a plugin or extension in the traditional sense — it is a **skill**: a self-contained intelligence bundle installed directly into an AI agent's configuration directory. When an agent starts a session, it loads the Forge SKILL.md as part of its system context, giving it architecture instructions, command routing, boot sequences, and runtime enforcement hooks. Each supported agent receives a copy of the full skill (scripts, profiles, reference docs, and templates), customized with agent-specific paths so every script invocation resolves correctly at runtime.
+
+## Supported Agents
+
+Forge deploys into five AI agents simultaneously, each with a hook model tailored to its extension system:
+
+| Agent | Install Directory | Hook Type | Hook | Effect |
+|-------|-------------------|-----------|------|--------|
+| **OpenCode** | `.opencode/skills/forge/` | SKILL.md system | — | Architecture instructions loaded at startup |
+| **Claude Code** | `.claude/skills/forge/` | PostToolUse | `forgeSentinel` | Reports violations after each Edit / Write / MultiEdit |
+| **Cursor** | `.cursor/skills/forge/` | preToolUse | `forgeSmith` | Can **DENY** writes that introduce CRITICAL or ERROR violations |
+| **Codex CLI** | `.agents/skills/forge/` | PostToolUse | `forgeSentinel` | Reports violations after Edit / Write / apply\_patch |
+| **Gemini** | `.gemini/skills/forge/` | SKILL.md | — | Architecture instructions loaded at startup |
+
+<Note>
+  All agents that expose a runtime hook share the same underlying violation-detection logic via `forgeSentinel-lib.mjs`. The difference is only *when* enforcement fires: Cursor's `forgeSmith` acts **before** a write, while the `forgeSentinel` adapters on Claude Code and Codex CLI act **after**.
+</Note>
+
+## Installation
+
+Install Forge into one or more agents using `npx`. The interactive wizard auto-detects which agents are present in your project:
+
+<CodeGroup>
+```bash Interactive wizard
+npx @ronaldjdevfs/forge install
+```
+
+```bash All detected agents
+npx @ronaldjdevfs/forge install --all
+```
+
+```bash Single agent — Claude Code
+npx @ronaldjdevfs/forge install --claude
+```
+
+```bash Single agent — Cursor
+npx @ronaldjdevfs/forge install --cursor
+```
+
+```bash Single agent — Codex CLI
+npx @ronaldjdevfs/forge install --codex
+```
+
+```bash Single agent — Gemini
+npx @ronaldjdevfs/forge install --gemini
+```
+
+```bash Single agent — OpenCode
+npx @ronaldjdevfs/forge install --opencode
+```
+
+```bash Global OpenCode install
+npx @ronaldjdevfs/forge install --global
+```
+</CodeGroup>
+
+<Note>
+  The `--global` flag installs Forge into `~/.config/opencode/skills/forge/` so it is available in every OpenCode session on your machine, not just the current project.
+</Note>
+
+The install flags and the agents they target:
+
+| Flag | Target Agent | Active Hook |
+|------|--------------|-------------|
+| `--opencode` | OpenCode | forgeSentinel (via SKILL.md) |
+| `--cursor` | Cursor | forgeSmith (preToolUse) |
+| `--claude` | Claude Code | forgeSentinel (PostToolUse) |
+| `--codex` | Codex CLI | forgeSentinel (PostToolUse) |
+| `--gemini` | Gemini Code Assist | — |
+| `--all` | All of the above | — |
+| `--global` | OpenCode (global) | forgeSentinel |
+
+## Path Rendering
+
+Every file in the Forge skill — SKILL.md, all reference docs, all scripts that call other scripts — uses the placeholder `{{AGENT_PATH}}` wherever the agent-specific root directory is needed. During installation, `cli.js` calls `renderSkillPaths()`, which recursively walks the installed skill directory and replaces every occurrence of `{{AGENT_PATH}}` with the agent's actual path:
+
+| Agent | `{{AGENT_PATH}}` resolves to |
+|-------|------------------------------|
+| OpenCode (local) | `.opencode/skills/forge` |
+| OpenCode (global) | `~/.config/opencode/skills/forge` |
+| Claude Code | `.claude/skills/forge` |
+| Cursor | `.cursor/skills/forge` |
+| Codex CLI | `.agents/skills/forge` |
+| Gemini | `.gemini/skills/forge` |
+
+This means a single source template produces correct, agent-specific installations. The boot sequence in SKILL.md, for example, becomes:
+
+```bash
+node .claude/skills/forge/scripts/context.mjs
+node .claude/skills/forge/scripts/graph.mjs --json
+# ... etc.
+```
+
+after Claude Code installation, and:
+
+```bash
+node .cursor/skills/forge/scripts/context.mjs
+node .cursor/skills/forge/scripts/graph.mjs --json
+# ... etc.
+```
+
+after Cursor installation — sourced from the same template.
+
+## Skill Directory Structure
+
+Every agent receives the same directory layout under its own root. Here is the structure as installed for Claude Code (`.claude/skills/forge/`):
+
+```text
+.claude/skills/forge/
+├── SKILL.md                     ← Orchestrator: boot sequence, command routing, execution flow
+├── scripts/
+│   ├── context.mjs              ← Detects stack, platform, features, shared, infra, graph
+│   ├── armorer.mjs              ← Ownership: orphans, duplicates, misplaced components
+│   ├── profile.mjs              ← Matches stack against 10 known profiles
+│   ├── graph.mjs                ← Architecture graph: 6 node types, R1-R9 rules, risk score
+│   ├── chain.mjs                ← Multi-layer dependency graph, topological sort
+│   ├── detect.mjs               ← Rule validation R1-R12, inline ignores, --fix
+│   ├── inspect.mjs              ← Full audit orchestrator (180 pts, 10 categories)
+│   ├── architecture.mjs         ← Generates / updates ARCHITECTURE.md
+│   ├── forgeSentinel.mjs        ← PostToolUse hook adapter (Claude / Codex / OpenCode)
+│   ├── forgeSentinel-lib.mjs    ← Shared violation-detection logic
+│   ├── forgeSmith.mjs           ← preToolUse write gate (Cursor only)
+│   ├── forgeSmith-admin.mjs     ← Hook management: on / off / status
+│   └── ...                      ← (assay, smelt, relocate, rollback, and more)
+├── reference/
+│   ├── principles.md
+│   ├── patterns.md
+│   ├── di-strategies.md
+│   ├── hooks.md
+│   └── ...                      ← (one .md per command)
+├── profiles/
+│   ├── express-mongodb.md
+│   ├── express-prisma.md
+│   ├── express-drizzle.md
+│   ├── fastify-mongodb.md
+│   ├── fastify-prisma.md
+│   ├── nestjs-mongodb.md
+│   └── ...                      ← (10 profiles total)
+└── templates/
+    ├── feature/                  ← 19 TypeScript templates for feature scaffolding
+    ├── platform/                 ← 6 templates for platform components
+    ├── shared/                   ← 4 templates for shared (errors, contracts, types, utils)
+    └── infra/                    ← 4 templates for infra (prisma, mongodb, redis, mail)
+```
+
+<Tip>
+  The OpenCode install also generates `/commands/forge-*.md` slash-commands so you can invoke every Forge command directly from the OpenCode command palette (e.g., `/forge-cast`, `/forge-inspect`, `/forge-quench`).
+</Tip>
+
+## Learn More
+
+<CardGroup cols={3}>
+  <Card title="Hooks" icon="shield-halved" href="/agents/hooks">
+    How forgeSentinel and forgeSmith enforce architecture rules in real time
+  </Card>
+  <Card title="Profiles" icon="layer-group" href="/agents/profiles">
+    10 pre-built tech profiles — Express, Fastify, NestJS × MongoDB, Postgres, Prisma, Drizzle
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Install Forge and run your first audit in under five minutes
+  </Card>
+</CardGroup>

@@ -1,0 +1,133 @@
+---
+title: "cast — Scaffold a Hexagonal Feature Slice"
+sidebarTitle: "cast"
+description: "cast generates a complete feature with hexagonal structure — domain entities, repositories, use cases, mappers, HTTP adapters, and DI wiring — following Forge's naming conventions."
+---
+
+`cast` creates a complete **vertical slice** for a new business domain. Rather than generating a skeleton you have to fill in manually, it scaffolds every hexagonal layer in one operation: the domain entity and repository interface, application use cases and mapper, HTTP controller and routes, the persistence adapter, and the DI wiring that ties everything together. The result is a feature that is architecturally correct from the very first commit, with zero violations against Forge's 13 dependency rules.
+
+## Usage
+
+<CodeGroup>
+
+```bash Agent (natural language)
+"crear feature users"
+"nuevo dominio orders"
+"cast payments"
+```
+
+```bash Direct
+cast <feature-name>
+```
+
+</CodeGroup>
+
+## Generated Structure
+
+For a feature named `users`, `cast` produces the following layout inside `src/features/`:
+
+```text
+src/features/users/
+├── domain/
+│   ├── entities/
+│   │   └── User.entity.ts
+│   ├── repositories/
+│   │   └── IUser.repository.ts
+│   ├── errors/
+│   │   └── UserNotFound.error.ts
+│   └── events/
+│       └── UserCreated.event.ts
+├── application/
+│   ├── use-cases/
+│   │   └── CreateUser.uc.ts
+│   └── mappers/
+│       └── User.mapper.ts
+└── adapters/
+    ├── in/
+    │   └── http/
+    │       ├── User.controller.ts
+    │       └── User.routes.ts
+    └── out/
+        └── persistence/
+            ├── User.repository.ts
+            └── User.schema.ts
+```
+
+Files are generated from Forge's **19 TypeScript templates** (`templates/feature/`). The exact content of each file — DI decorators, persistence patterns, controller style — adapts to the active [technology profile](/commands/forge#technology-detection).
+
+### Naming Conventions
+
+| Artifact | Format | Example |
+|----------|--------|---------|
+| Feature directory | `kebab-case/` | `credit-card/` |
+| Entity | `<Name>.entity.ts` | `User.entity.ts` |
+| Repository interface | `I<Name>.repository.ts` | `IUser.repository.ts` |
+| Repository implementation | `<Name>.repository.ts` | `User.repository.ts` |
+| Use case | `<Action>.uc.ts` | `CreateUser.uc.ts` |
+| Mapper | `<Name>.mapper.ts` | `User.mapper.ts` |
+| Controller | `<Name>.controller.ts` | `User.controller.ts` |
+| Routes | `<Name>.routes.ts` | `User.routes.ts` |
+| Schema | `<Name>.schema.ts` | `User.schema.ts` |
+
+## Pre-Cast Verification
+
+Before creating any files, `cast` verifies that the three shared layers exist. If any is missing, Forge bootstraps it automatically before proceeding:
+
+<Steps>
+  <Step title="Platform layer">
+    Checks that `src/platform/` exists with its core subdirectories (`config/`, `database/`, `http/`, `server/`, `logger/`, `di/`, etc.). Creates them if absent.
+  </Step>
+  <Step title="Shared layer">
+    Checks that `src/shared/` exists with `errors/`, `contracts/`, `types/`, and `utils/`. Creates them if absent.
+  </Step>
+  <Step title="Infrastructure layer">
+    Checks that `src/infra/` exists with the appropriate adapter directories for the active profile (e.g., `prisma/`, `mongodb/`, `redis/`). Creates them if absent.
+  </Step>
+</Steps>
+
+## Post-Cast Checklist
+
+After the files are generated, the following steps are **mandatory** before the feature is considered complete:
+
+<Steps>
+  <Step title="Entity Discovery">
+    Before using the scaffolded `<Name>.entity.ts`, check whether the entity already exists as a shared entity in `src/platform/domain/entities/`. If it does, **do not create a local entity**. Instead, import from `@/domain/entities/<Name>.js` (path alias) in all generated files. Also check `src/shared/contracts/` for existing DTOs or interfaces.
+  </Step>
+  <Step title="DI Wiring">
+    Create `src/features/<name>/di.ts` following the `templates/feature/di.ts.md` template. If a `src/platform/setting/dependencies/<name>.di.js` already exists, point controllers there instead. Controllers must **never** import from `bootstrap.di.js` (violates R12).
+
+    <Warning>
+      If the persistence schema exports `export default model()` (a Mongoose model instance, not a class), the DI registration must use `container.register(..., { useValue: ... })` — **not** `registerSingleton`. Using `registerSingleton` with a Mongoose `model()` is a R12b violation.
+    </Warning>
+  </Step>
+  <Step title="Tests">
+    Create `src/features/<name>/__tests__/Create<Name>.test.ts` following `templates/feature/test.ts.md`. Tests use `node:test` (no external test runner required). Key conventions: `.js` extension on all imports, `as const` for union type literals, `result!` for non-null assertions, `(result as any)._id` when `_id` is not on the domain type.
+  </Step>
+  <Step title="Import Validation">
+    Before marking the feature done, verify every generated file passes these checks:
+
+    - **R10**: All local imports use `./`, `../`, or `@/` as a prefix — no bare specifiers like `import X from "domain/..."`
+    - **R11**: All local imports use `.js` extension — never `.ts`
+    - **R12**: Controllers import from `./di.js` or `@/setting/dependencies/` — never from `bootstrap.di.js`
+    - Controller method names match the route handler references (e.g., `createHandler` in controller → `controller.createHandler` in routes)
+  </Step>
+  <Step title="Run quench">
+    Run `forge quench` and confirm **0 violations** before considering the feature complete.
+  </Step>
+</Steps>
+
+## Templates
+
+Forge ships **19 TypeScript templates** for feature scaffolding under `templates/feature/`. Each template adapts its content to the active technology profile — for example, a `fastify-prisma` profile generates a different controller style and persistence layer than `express-mongodb`. Templates cover:
+
+- Entity, repository interface, repository implementation
+- Use cases (Create, Get, List, Update, Delete)
+- Mapper (toDomain / toPersistence)
+- Schema (Mongoose schema or Prisma model)
+- HTTP controller and routes
+- DI wiring (`di.ts`)
+- Unit test scaffold
+
+<Tip>
+  Run `forge inspect` after `cast` completes to confirm the new feature scores correctly and contributes positively to the Structure, Layers, Decorators, and Ownership categories.
+</Tip>

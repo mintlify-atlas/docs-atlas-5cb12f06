@@ -1,0 +1,125 @@
+---
+title: "quench — Validate 13 Architectural Rules"
+sidebarTitle: "quench"
+description: "quench runs all 13 architectural dependency rules (R1–R13) and reports violations with severity. Use --fix to auto-correct WARNING-level issues."
+---
+
+`quench` is Forge's rule validator. It runs all **13 architectural dependency rules (R1–R13)** against your codebase and reports every violation with its severity level. Unlike `inspect` — which produces a full scored report across 10 categories — `quench` is focused and fast, designed to run after every meaningful change to guarantee the rule baseline is clean. Use it in CI pipelines, as a pre-commit check, or immediately after `cast`, `reforge`, or any manual refactoring to confirm the architectural constraints are still intact.
+
+## Usage
+
+<CodeGroup>
+
+```bash Check all rules
+forge quench
+```
+
+```bash Auto-fix WARNING/INFO violations
+forge quench --fix
+```
+
+```bash Show all inline ignores in code
+forge quench --show-ignores
+```
+
+</CodeGroup>
+
+## Rules Checked
+
+`quench` evaluates 13 rules organized by the type of dependency they protect:
+
+| Rule | Description | Severity |
+|------|-------------|----------|
+| **R1** | `feature → infra` (prohibited) | CRITICAL |
+| **R2** | `platform → feature` (prohibited) | CRITICAL |
+| **R3** | `shared → feature` (prohibited) | ERROR |
+| **R4** | `shared → infra` (prohibited) | ERROR |
+| **R5** | `domain → infra` (prohibited) | CRITICAL |
+| **R6** | `domain → platform` (prohibited) | CRITICAL |
+| **R7** | `infra → feature` (prohibited) | WARNING |
+| **R8** | Cross-feature direct imports | ERROR |
+| **R9** | Dependency cycles | ERROR |
+| **R10** | Bare specifiers in local imports | ERROR |
+| **R11** | `.ts` extension in imports (must be `.js`) | ERROR |
+| **R12** | Import to `bootstrap.di.js` | CRITICAL |
+| **R12b** | `registerSingleton` with Mongoose `model()` | CRITICAL |
+| **R13** | Domain artifacts in `platform/` | CRITICAL |
+
+### Understanding the Rules
+
+<CardGroup cols={2}>
+  <Card title="Layer Boundary Rules (R1–R7)" icon="layer-group">
+    Protect the four-layer boundary model. R1–R6 are CRITICAL because they represent fundamental inversions of the dependency direction that underpins hexagonal architecture. R7 is WARNING because `infra → feature` is architecturally wrong but rarely causes immediate runtime failures.
+  </Card>
+  <Card title="Coupling Rules (R8–R9)" icon="link-slash">
+    R8 prevents feature-to-feature coupling that creates hidden dependencies. R9 catches circular dependency chains that make the build order undefined and testing nearly impossible.
+  </Card>
+  <Card title="Import Convention Rules (R10–R12)" icon="file-import">
+    R10–R12 enforce ESM import hygiene. R10 and R11 ensure the codebase runs correctly under `verbatimModuleSyntax`. R12 prevents controllers from depending on the bootstrap entrypoint, which creates a global coupling point.
+  </Card>
+  <Card title="Structural Rules (R13)" icon="sitemap">
+    R13 prevents domain artifacts (entities, use cases, mappers, repository interfaces) from being placed in `platform/`, where they would pollute the technical backbone with business logic.
+  </Card>
+</CardGroup>
+
+## Inline Ignores
+
+When a violation is intentional (e.g., a deliberate bridge between layers during a migration), you can suppress it with inline ignore comments:
+
+<Tabs>
+  <Tab title="Ignore all rules on next line">
+    ```typescript
+    // forge-ignore-next-line
+    import { something } from '../infra/prisma';  // not reported
+    ```
+  </Tab>
+  <Tab title="Ignore a specific rule">
+    ```typescript
+    // forge-ignore: R1
+    import { PrismaClient } from '../../infra/prisma/client.js'; // only R1 ignored
+    ```
+  </Tab>
+  <Tab title="Ignore multiple rules">
+    ```typescript
+    // forge-ignore: R1, R8
+    import { crossFeature } from '../other-feature/domain/Entity.js'; // R1 and R8 ignored
+    ```
+  </Tab>
+</Tabs>
+
+To list every active ignore comment across the entire codebase, run:
+
+```bash
+forge quench --show-ignores
+```
+
+This outputs each ignore with its file path, line number, and the rules being suppressed — useful for auditing whether ignores are still justified over time.
+
+## --fix Auto-Corrections
+
+Running `quench --fix` automatically corrects violations at the `WARNING` and `INFO` severity levels. What `--fix` handles:
+
+- Missing `@injectable()` decorators on use cases, controllers, and repositories (for tsyringe profiles)
+- Missing `@inject()` decorators where constructor injection is required
+- `tsconfig.json` issues (e.g., missing `emitDecoratorMetadata`, `experimentalDecorators`)
+- Naming convention violations (file and directory casing)
+- `container.resolve()` patterns in use cases (replaced with constructor injection)
+
+<Warning>
+  **CRITICAL violations (R1, R2, R5, R6, R12, R13) cannot be auto-fixed.** These represent fundamental architectural violations — a feature reaching directly into `infra/`, domain logic depending on platform internals, or business logic placed in the wrong layer. They require deliberate manual refactoring. Use `forge relocate` or `forge reforge` to restructure the code correctly.
+</Warning>
+
+## Integration with CI
+
+`quench` exits with a non-zero status code when any violations are found, making it suitable as a CI gate:
+
+```bash
+# In your CI pipeline
+forge quench || exit 1
+```
+
+For severity-filtered output (only fail on ERROR and above):
+
+```bash
+node .opencode/skills/forge/scripts/detect.mjs --severity ERROR
+```

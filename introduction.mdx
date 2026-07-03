@@ -1,0 +1,110 @@
+---
+title: "Forge: Architecture Operating System for Backend Systems"
+sidebarTitle: "Introduction"
+description: "Forge is an architecture governance CLI and AI agent skill that enforces Hexagonal Architecture, Pragmatic DDD, and Vertical Slices — with automated auditing, scaffolding, and rule enforcement across 13 dependency rules."
+---
+
+Forge is an **architecture operating system** for backend systems. It models, builds, audits, protects, and evolves complete backend projects across four mandatory architectural domains — Platform, Features, Shared, and Infrastructure. Unlike a boilerplate template or a style guide, Forge is an active orchestrator: it detects your technology stack, bootstraps the correct layer structure, validates dependency rules on every file write, and maintains a living `ARCHITECTURE.md` that reflects the real state of your codebase at all times. It ships as an npm package (`@ronaldjdevfs/forge`) and integrates directly into your AI agent as a **skill**, so architectural governance happens automatically in every coding session.
+
+---
+
+## The Problem
+
+Backend projects degrade over time in a predictable pattern. Infrastructure code and business rules accumulate in the same files. Controllers reach directly into databases. Platform plumbing imports feature logic. Features call each other through hidden side channels. After months of this, there is no clear ownership — any change in one place breaks something unrelated, and nobody can confidently answer the question "what does this module depend on?"
+
+Conventional solutions — code reviews, linting rules, architecture decision records — all rely on human memory and discipline. They work until they don't, and they provide no automated enforcement. When an AI agent is writing hundreds of files per session, the problem is orders of magnitude worse: the agent has no persistent model of your architecture and will happily violate every rule you've established.
+
+Forge solves this by giving your AI agent a **persistent, queryable architecture model** — a source of truth it can consult before every file write and after every code change.
+
+---
+
+## The Solution
+
+Forge enforces a four-domain model on every backend project it governs. Each domain has a strict contract about what it may contain and what it may depend on.
+
+| Domain | Purpose | Contains |
+|--------|---------|----------|
+| **Platform** | Global technical backbone | Config, server, logger, DI container, database connection, cache, security middleware, event bus, scheduler, observability |
+| **Features** | Business capabilities (vertical slices) | Domain entities, repositories (interfaces), use cases, mappers, HTTP adapters (controllers + routes), persistence adapters |
+| **Shared** | Pure reusable code with no external dependencies | Errors, contracts/interfaces, types, utility functions — no business logic, no infrastructure imports |
+| **Infra** | Concrete implementations of external systems | Prisma/Mongoose/Drizzle clients, Redis service, mail service — no business rules |
+
+These four domains map directly to directories under `src/`: `platform/`, `features/`, `shared/`, and `infra/`. Every file in your project belongs to exactly one domain. Forge's ownership engine detects orphans (files outside any domain), duplicates (files that exist in more than one domain), and misplaced components (files whose content contradicts their location) and surfaces them in every audit.
+
+---
+
+## Key Capabilities
+
+<CardGroup cols={2}>
+  <Card title="Scaffold with cast" icon="hammer" href="/commands/cast">
+    Generate a complete Hexagonal Architecture feature slice in seconds. `cast` creates the full directory tree — domain entities, repository interfaces, use cases, mappers, HTTP controllers, routes, and persistence adapters — from a set of 19 typed TypeScript templates. It also bootstraps `platform/`, `shared/`, and `infra/` if they don't exist yet.
+  </Card>
+  <Card title="Audit with inspect" icon="magnifying-glass" href="/commands/inspect">
+    Run a full architecture audit scored across 10 categories and 180 points, normalized to a 0–100 score with letter grade A–F. Categories include structure, layers, decorators, ownership, platform completeness, dependency direction, graph health, custom rules, naming conventions, and import conventions (R10–R12).
+  </Card>
+  <Card title="Enforce rules with quench" icon="shield-check" href="/commands/quench">
+    Validate all 13 dependency rules (R1–R13) across your codebase, with inline `// forge-ignore` support for deliberate exceptions. Use `--fix` to auto-correct WARNING-level violations such as missing `@injectable()` decorators, naming conventions, and `tsconfig` settings. Use `--show-ignores` to audit every suppressed rule.
+  </Card>
+  <Card title="AI agent integration" icon="robot" href="/agents/overview">
+    Forge ships as a **skill** for OpenCode, Claude Code, Cursor, Codex CLI, and Gemini. Once installed, your agent loads the skill automatically and enforces architecture on every session. Two hooks — `forgeSentinel` (PostToolUse) and `forgeSmith` (preToolUse) — provide post-write reporting and pre-write denial of critical violations.
+  </Card>
+</CardGroup>
+
+---
+
+## Architecture Graph
+
+The architecture graph is Forge's source of truth. It is a directed graph built from your actual source files — not from configuration — that maps every module to its domain, every import to a directed edge, and every cross-layer dependency to a rule check. Forge rebuilds this graph on every audit and uses it to compute risk scores and flag illegal dependency paths.
+
+The graph uses **6 node types**:
+
+| Node Type | Description |
+|-----------|-------------|
+| `platform` | Global backbone modules (config, server, DI, logger, etc.) |
+| `feature` | Business capability slices |
+| `shared` | Pure cross-cutting code |
+| `infra` | Concrete external-system implementations |
+| `domain` | Domain layer within a feature (entities, repositories, errors, events) |
+| `adapter` | Adapter layer within a feature (HTTP controllers, persistence repos) |
+
+The graph engine enforces **13 dependency rules** (R1–R13) covering forbidden cross-layer imports, cross-feature direct coupling, dependency cycles, bare specifier imports, `.ts` file extensions in ESM imports, and illegal DI bootstrap patterns. Each rule carries a severity of CRITICAL, ERROR, or WARNING.
+
+Every graph evaluation produces a **risk score** and a **dependency health** indicator. These feed directly into the `inspect` audit score and the `ARCHITECTURE.md` report that Forge maintains after every operation.
+
+<Note>
+  The complete list of rules, their severities, and examples of violations and fixes is documented in the [Architecture Overview](/architecture/overview).
+</Note>
+
+---
+
+## Supported Agents
+
+Forge integrates with five AI coding agents. The integration model varies by agent: some use a PostToolUse hook that reports violations after each file write, others use a preToolUse gate that can deny writes before they hit disk.
+
+| Agent | Install Flag | Skill Directory | Hook | Hook Type |
+|-------|-------------|----------------|------|-----------|
+| **OpenCode** | `--opencode` | `.opencode/skills/forge/` | — | Via SKILL.md system |
+| **Claude Code** | `--claude` | `.claude/skills/forge/` | `forgeSentinel` | PostToolUse |
+| **Cursor** | `--cursor` | `.cursor/skills/forge/` | `forgeSmith` | preToolUse |
+| **Codex CLI** | `--codex` | `.agents/skills/forge/` | `forgeSentinel` | PostToolUse |
+| **Gemini** | `--gemini` | `.gemini/skills/forge/` | — | Via SKILL.md |
+
+All hooks share the same violation-detection logic through `forgeSentinel-lib.mjs`, so rule enforcement is consistent across every agent.
+
+<Tip>
+  You can install Forge for multiple agents simultaneously with `npx @ronaldjdevfs/forge install --all`, or run the interactive wizard with `npx @ronaldjdevfs/forge install` to choose agents individually.
+</Tip>
+
+---
+
+## Requirements & Dependencies
+
+<Note>
+  Forge requires **Node.js 18 or higher**. It has no runtime dependencies that affect your project — the only npm dependencies in `@ronaldjdevfs/forge` are `@clack/prompts` and `picocolors`, used exclusively by the installer CLI. All skill scripts are self-contained ESM modules (`.mjs`) that run directly on Node.js without any additional packages.
+</Note>
+
+**Ready to get started?**
+
+- [Install Forge](/installation) — set up the skill in your agent environment
+- [Quickstart](/quickstart) — initialize a project, run your first audit, and scaffold a feature in under 5 minutes
+- [Architecture Overview](/architecture/overview) — deep-dive into the four-domain model and all 13 rules

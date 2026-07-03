@@ -1,0 +1,193 @@
+---
+title: "Naming Conventions for Files, Classes, and Interfaces"
+sidebarTitle: "Naming"
+description: "Forge enforces consistent naming across directories, files, classes, interfaces, use cases, and more. Learn the exact patterns for each artifact type in your backend system."
+---
+
+Consistent naming is not cosmetic in a Forge-governed system — it is functional. The `armorer` module identifies ownership by scanning file suffixes and directory paths. The `inspect` audit uses suffixes to detect orphaned components, misplaced domain artifacts, and R13 violations (domain files in `platform/`). The `quench` validator checks naming conventions as a dedicated scoring category. If a file is named incorrectly, Forge cannot classify it, and an unclassified file is treated as an orphan in the ownership report. Every name in a Forge project is a machine-readable signal.
+
+---
+
+## File and Directory Naming
+
+| Element | Format | Example |
+|---|---|---|
+| Directories | `kebab-case/` | `credit-card/`, `event-bus/`, `user-profile/` |
+| Files (artifacts) | `<PascalCase>.<artifact>.ts` | `User.entity.ts`, `CreateUser.uc.ts` |
+| Interfaces | `I<PascalCase>.<artifact>.ts` | `IUser.repository.ts`, `IPayment.port.ts` |
+| Ports (domain) | `<Name>.port.ts` | `PaymentPort.port.ts`, `EmailPort.port.ts` |
+| Use cases | `<Action>.uc.ts` | `CreateUser.uc.ts`, `GetOrder.uc.ts` |
+| Barrel files | `index.ts` | Named exports only — no `export default` |
+
+## Class and Function Naming
+
+| Element | Format | Example |
+|---|---|---|
+| Classes | `PascalCase` | `UserController`, `DatabaseConfig`, `LoggerService` |
+| Functions | `camelCase` | `formatDate`, `calculateTotal`, `buildQuery` |
+| Constants | `UPPER_SNAKE_CASE` | `MAX_RETRIES`, `DEFAULT_PAGE_SIZE`, `MAX_RETRY_COUNT` |
+| Types / pure interfaces | `PascalCase` | `UserPayload`, `PaginatedResult`, `OrderStatus` |
+| Enums | `PascalCase` | `UserRole`, `OrderStatus`, `PaymentMethod` |
+| Variables | `camelCase` | `userService`, `prismaClient`, `requestId` |
+
+---
+
+## Artifact Suffixes
+
+These suffixes are the vocabulary Forge uses to classify every file in your project. Files without a recognized suffix are flagged as orphans in the ownership report.
+
+| Suffix | Artifact Type | Belongs In |
+|---|---|---|
+| `.entity.ts` | Domain entity | `features/<name>/domain/entities/` |
+| `.repository.ts` | Repository implementation (concrete) | `features/<name>/adapters/out/persistence/` |
+| `.uc.ts` | Use case | `features/<name>/application/use-cases/` |
+| `.mapper.ts` | Domain mapper | `features/<name>/application/mappers/` |
+| `.controller.ts` | HTTP controller | `features/<name>/adapters/in/http/` |
+| `.routes.ts` | Route definitions | `features/<name>/adapters/in/http/` |
+| `.schema.ts` | Database schema | `features/<name>/adapters/out/persistence/` |
+| `.error.ts` | Domain-specific error | `features/<name>/domain/errors/` |
+| `.event.ts` | Domain event | `features/<name>/domain/events/` |
+| `.service.ts` | Platform / infrastructure service | `platform/<module>/` or `infra/<provider>/` |
+| `.port.ts` | Domain port (interface) | `features/<name>/domain/repositories/` |
+| `.config.ts` | Configuration module | `platform/config/` |
+
+<Note>
+  The `armorer` step in the boot sequence and the `inspect` command both rely on these suffixes to detect ownership violations. A `.entity.ts` file inside `src/platform/` triggers R13 CRITICAL regardless of its contents. A `.uc.ts` file outside of a `features/` directory is flagged as a misplaced component.
+</Note>
+
+### Interface and Port Naming
+
+Interfaces for repository ports follow the `I<Name>.repository.ts` pattern. General domain ports (adapters to external services) use `<Name>.port.ts`:
+
+```text
+src/features/users/domain/repositories/
+├── IUser.repository.ts          ← repository port interface
+└── IUserCache.port.ts           ← cache port interface (optional)
+
+src/features/payments/domain/repositories/
+├── IPayment.repository.ts
+└── IPaymentGateway.port.ts      ← external payment service port
+```
+
+### Domain Event Naming
+
+Domain events always use past tense to reflect a fact that has already occurred:
+
+```text
+src/features/users/domain/events/
+├── UserCreated.event.ts         ✅ past tense
+├── UserUpdated.event.ts         ✅
+└── UserDeleted.event.ts         ✅
+
+# Never imperative:
+# CreateUser.event.ts            ❌ imperative
+# OnUserCreate.event.ts          ❌ handler-style name
+```
+
+---
+
+## Feature Structure Example
+
+The following shows a complete `users` feature with every file named according to Forge conventions:
+
+```text
+src/features/users/
+├── domain/
+│   ├── entities/
+│   │   └── User.entity.ts                    ← .entity.ts
+│   ├── repositories/
+│   │   └── IUser.repository.ts               ← I<Name>.repository.ts
+│   ├── errors/
+│   │   ├── UserNotFound.error.ts             ← .error.ts
+│   │   └── UserAlreadyExists.error.ts
+│   └── events/
+│       ├── UserCreated.event.ts              ← .event.ts (past tense)
+│       └── UserDeleted.event.ts
+├── application/
+│   ├── use-cases/
+│   │   ├── CreateUser.uc.ts                  ← <Action>.uc.ts
+│   │   ├── GetUser.uc.ts
+│   │   ├── ListUsers.uc.ts
+│   │   ├── UpdateUser.uc.ts
+│   │   └── DeleteUser.uc.ts
+│   └── mappers/
+│       └── User.mapper.ts                    ← .mapper.ts
+└── adapters/
+    ├── in/http/
+    │   ├── User.controller.ts               ← .controller.ts
+    │   └── User.routes.ts                   ← .routes.ts
+    └── out/persistence/
+        ├── User.repository.ts               ← .repository.ts (concrete impl)
+        └── User.schema.ts                   ← .schema.ts
+```
+
+The corresponding class names follow the same pattern:
+
+```typescript
+// User.entity.ts
+export class UserEntity { ... }
+
+// IUser.repository.ts
+export interface IUserRepository { ... }
+
+// CreateUser.uc.ts
+export class CreateUserUseCase { ... }
+
+// User.mapper.ts
+export class UserMapper { ... }
+
+// User.controller.ts
+export class UserController { ... }
+
+// User.repository.ts (concrete)
+export class UserRepository implements IUserRepository { ... }
+```
+
+---
+
+## Platform Layer Naming
+
+Platform files follow the same `<PascalCase>.<artifact>.ts` pattern but scoped to technical concerns:
+
+```text
+src/platform/
+├── config/
+│   ├── App.config.ts             ← .config.ts
+│   └── Env.config.ts
+├── server/
+│   └── Server.ts                 ← plain PascalCase (no artifact suffix for top-level modules)
+├── logger/
+│   ├── Logger.config.ts
+│   └── Logger.service.ts         ← .service.ts
+├── security/
+│   ├── Auth.middleware.ts        ← .middleware.ts
+│   └── Encryption.service.ts
+└── di/
+    ├── Container.ts
+    └── Tokens.ts
+```
+
+## Shared Layer Naming
+
+Shared uses slightly different conventions for each of its four sub-directories:
+
+```text
+src/shared/
+├── errors/
+│   ├── NotFoundError.ts          ← <Name>Error.ts  (no dot-suffix)
+│   ├── ValidationError.ts
+│   └── ConflictError.ts
+├── contracts/
+│   └── IPaginatedResponse.ts     ← I<Name>.ts
+├── types/
+│   └── api.types.ts              ← <domain>.types.ts  (all lowercase)
+└── utils/
+    ├── formatDate.ts             ← camelCase.ts
+    └── pagination.ts
+```
+
+---
+
+<Tip>
+  Run `forge quench` to validate naming conventions across the entire project. The **Naming** category contributes 10 points to the `inspect` score. Use `forge quench --fix` to auto-correct violations where Forge can infer the correct name from the file's contents and location.
+</Tip>

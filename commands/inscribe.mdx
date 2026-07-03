@@ -1,0 +1,146 @@
+---
+title: "inscribe — Generate and Update ARCHITECTURE.md"
+sidebarTitle: "inscribe"
+description: "inscribe generates or updates your project's living ARCHITECTURE.md file with metrics, ownership report, architecture graph, dependency health, risk score, and last audit score."
+---
+
+`ARCHITECTURE.md` is Forge's living architecture document — a machine-generated, always-current snapshot of your project's structural state. It captures everything that matters for understanding the system: the detected technology stack, all four architectural layers, the ownership report, the full architecture graph with its 6 node types, dependency health, risk score, every active rule violation, and the latest audit score. Because it is committed to version control alongside your code, it serves as a shared contract between developers and AI agents about the current architectural state — reviewers never have to run a tool to understand what the architecture looks like right now.
+
+## Usage
+
+<CodeGroup>
+
+```bash Agent (natural language)
+"inscribir"
+"grabar"
+"ARCHITECTURE.md"
+```
+
+```bash Direct
+node .opencode/skills/forge/scripts/architecture.mjs
+```
+
+</CodeGroup>
+
+## What ARCHITECTURE.md Contains
+
+`inscribe` generates a comprehensive document with the following sections:
+
+<Steps>
+  <Step title="Project Metadata">
+    Auto-detected tech stack: framework (Express / Fastify / NestJS), database (MongoDB / PostgreSQL), ORM (Mongoose / Prisma / Drizzle), DI strategy (tsyringe / NestJS DI / manual), active technology profile, and architecture model name.
+  </Step>
+  <Step title="Platform Components">
+    Every component detected in `src/platform/` — config, database, HTTP, server, logger, cache, security, events, scheduler, observability, and DI.
+  </Step>
+  <Step title="Features List">
+    All feature slices in `src/features/`, each with their detected subdirectories and completeness status.
+  </Step>
+  <Step title="Shared Components">
+    All components in `src/shared/`: errors, contracts, types, and utils.
+  </Step>
+  <Step title="Infrastructure Implementations">
+    All adapters in `src/infra/`: Prisma client, MongoDB config, Redis service, mail service, and any others detected.
+  </Step>
+  <Step title="Ownership Report">
+    The output of `armorer.mjs`: ownership health score, count of orphans (components with no owner), duplicates (same artifact in multiple places), and misplaced components (files in the wrong layer), with relocation suggestions.
+  </Step>
+  <Step title="Architecture Graph">
+    The full graph with all 4 layers rendered as sections — Platform Layer, Feature Layer, Shared Layer, Infrastructure Layer, Domain Layer, and Adapter Layer. Includes total node and edge counts.
+  </Step>
+  <Step title="Dependency Health & Risk Score">
+    Valid edge ratio (e.g., `19/20`), dependency health percentage, and a risk score from 0 to 100 (lower is better).
+  </Step>
+  <Step title="Rule Violations (R1–R13)">
+    Every active violation in a table: rule ID, source node, target node, severity, and description.
+  </Step>
+  <Step title="Last Audit Score">
+    The normalized 0–100 score and A–F grade from the most recent `inspect` run, with the date of the audit.
+  </Step>
+</Steps>
+
+### Sample Format
+
+```markdown
+# Architecture State
+
+**Project Name:** my-api
+**Framework:** Express
+**Database:** PostgreSQL
+**ORM:** Prisma
+**DI Strategy:** tsyringe
+**Profile:** express-prisma
+**Architecture:** hexagonal-feature (Platform + Features + Shared + Infra)
+**Last Audit:** 2025-01-15 (score: 87/100, grade: B)
+
+## Platform
+- platform/config/
+- platform/database/
+- platform/http/
+- platform/server/
+- platform/logger/
+- platform/di/
+
+## Features
+- features/users/
+- features/payments/
+
+## Shared
+- shared/errors/
+- shared/types/
+- shared/contracts/
+
+## Infrastructure
+- infra/prisma/
+- infra/redis/
+
+## Ownership
+**Health:** healthy
+**Score:** 92/100
+**Orphans:** 0
+**Duplicates:** 0
+**Misplaced:** 1
+
+## Architecture Graph
+**Nodes:** 15
+**Edges:** 22
+**Risk Score:** 8/100
+**Health:** healthy
+**Dependency Health:** 95%
+
+### Violations
+| Rule | From | To | Severity | Description |
+|------|------|----|----------|-------------|
+| R13  | platform:users | — | CRITICAL  | Domain artifact in platform/ |
+```
+
+## Auto-Update
+
+`inscribe` runs automatically **twice** during every Forge operation — at step 7 (before the command executes) and step 9 (after the command completes) of the [boot sequence](/commands/forge#boot-sequence). This means `ARCHITECTURE.md` is always current after any `cast`, `quench`, `inspect`, or other Forge command, with no manual intervention required.
+
+The document is updated in-place. Forge preserves any additional sections you write manually (such as Architecture Decision Records or team notes) while regenerating only the auto-detected fields.
+
+<Note>
+  **ARCHITECTURE.md should be committed to version control.** It is not a build artifact — it is a first-class project document that serves as a contract between developers and AI agents about the current architectural state. Forge reads it at the start of every interaction to orient itself before acting.
+</Note>
+
+## Fields Auto-Detected
+
+| Field | Source Script |
+|-------|---------------|
+| Framework, Database, ORM, DI Strategy | `context.mjs` |
+| Active Profile | `profile.mjs` |
+| Platform, Features, Shared, Infra lists | `context.mjs` |
+| Ownership health, orphans, duplicates, misplaced | `armorer.mjs` |
+| Architecture graph (nodes, edges, layers) | `graph.mjs` |
+| Risk Score, Dependency Health | `graph.mjs → stats` |
+| Rule violations (R1–R13) | `graph.mjs → violations` |
+| Last Audit score and grade | `inspect.mjs` |
+
+## Staleness Detection
+
+If `ARCHITECTURE.md` was last updated more than **7 days ago**, Forge detects it as stale and suggests running `inscribe` to refresh it. This check happens automatically during the boot sequence so you are always notified before the stale data influences a decision.
+
+<Tip>
+  Run `inscribe` before code reviews to ensure reviewers have the latest architecture view. A current `ARCHITECTURE.md` makes it immediately clear whether a PR is introducing violations or improving the architecture score.
+</Tip>

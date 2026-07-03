@@ -1,0 +1,141 @@
+---
+title: "temper — Harden Dependency Injection Across Your Project"
+sidebarTitle: "temper"
+description: "temper applies constructor injection and removes service locator patterns across your project, adding @injectable() and @inject() decorators according to your technology profile."
+---
+
+Dependency Injection is the foundation of testable, loosely-coupled backend code. When classes resolve their own dependencies — by calling `container.resolve()` mid-logic, or by instantiating collaborators with `new` — they become impossible to unit-test without spinning up the full runtime, and the hidden coupling they create is invisible to static analysis and architectural audits. `forge temper` automates the remediation: it walks your project, identifies classes that violate DI discipline, and applies the correct injection pattern for your active technology profile — whether that is `tsyringe` decorators, NestJS's built-in DI system, or manual constructor injection.
+
+## Usage
+
+```bash
+# Via agent natural language: "templar", "endurecer", "mejorar"
+# Direct invocation:
+forge temper
+```
+
+## What temper Does
+
+`temper` adapts its behaviour to the DI strategy associated with your active technology profile (detected by `forge profile`):
+
+<Tabs>
+  <Tab title="tsyringe profiles">
+    Applies to: `express-mongodb`, `express-prisma`, `express-drizzle`, and `fastify-prisma` profiles that use tsyringe.
+
+    - Adds `@injectable()` to every class that has injected dependencies
+    - Adds `@inject(TOKEN)` to each constructor parameter, using class tokens — never plain strings
+    - Removes `container.resolve()` calls from use cases, domain objects, and adapters (resolving is only allowed in bootstrap files such as `app.ts` or routes)
+
+    ```typescript
+    // Before
+    import { container } from "tsyringe";
+
+    export class CreateUserUseCase {
+      execute(dto: CreateUserDto) {
+        const repo = container.resolve(UserRepository); // ← service locator
+        return repo.save(dto);
+      }
+    }
+
+    // After
+    import { injectable, inject } from "tsyringe";
+    import { IUserRepository } from "../../domain/repositories/IUser.repository.js";
+    import { TOKENS } from "../../../platform/di/Tokens.js";
+
+    @injectable()
+    export class CreateUserUseCase {
+      constructor(
+        @inject(TOKENS.UserRepository)
+        private readonly userRepository: IUserRepository,
+      ) {}
+
+      execute(dto: CreateUserDto) {
+        return this.userRepository.save(dto);
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Manual DI profiles">
+    Applies to: `express-postgres`, `fastify-mongodb`, `fastify-postgres` and other profiles without a DI container.
+
+    - Converts service-locator patterns to constructor injection
+    - Removes `container.resolve()` calls and replaces them with constructor parameters
+    - Dependencies are wired explicitly in the bootstrap layer
+
+    ```typescript
+    // Before
+    export class CreateOrderUseCase {
+      execute(dto: CreateOrderDto) {
+        const repo = getService("OrderRepository"); // ← service locator
+        return repo.save(dto);
+      }
+    }
+
+    // After
+    export class CreateOrderUseCase {
+      constructor(
+        private readonly orderRepository: IOrderRepository,
+      ) {}
+
+      execute(dto: CreateOrderDto) {
+        return this.orderRepository.save(dto);
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="NestJS profiles">
+    Applies to: `nestjs-mongodb`, `nestjs-postgres`, `nestjs-prisma`.
+
+    NestJS ships its own DI system. `temper` uses `@Injectable()` and `@Inject()` from `@nestjs/common` rather than tsyringe — it does not mix the two.
+
+    - Adds `@Injectable()` to services, use cases, and repositories
+    - Adds `@Inject()` with the correct token for non-class providers
+    - Configures module `providers` and `exports` arrays
+
+    ```typescript
+    // Before
+    export class UserService {
+      constructor() {
+        this.userRepo = moduleRef.get(UserRepository); // ← anti-pattern
+      }
+    }
+
+    // After
+    import { Injectable } from "@nestjs/common";
+    import { UserRepository } from "../repositories/User.repository.js";
+
+    @Injectable()
+    export class UserService {
+      constructor(
+        private readonly userRepository: UserRepository,
+      ) {}
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## DI Rules Enforced
+
+Regardless of profile, `temper` enforces these universal rules:
+
+| Rule | Severity |
+|------|----------|
+| Always use constructor injection | ERROR |
+| No service locators (`container.resolve()` outside bootstrap) | ERROR |
+| No global singletons shared across features | WARNING |
+| No `new Dependency()` inside injected classes | WARNING |
+
+### What is prohibited
+
+- ❌ `container.resolve()` inside use cases, entities, or adapters
+- ❌ `new UseCase(dep1, dep2)` in features that use a DI container
+- ❌ Importing `tsyringe` in domain files
+- ❌ Mixing manual DI and container DI within the same feature
+
+<Tip>
+  Run `forge quench` after `temper` to verify that the **Decorators** category improves in the audit report (Decorators contributes 20 points to the total 180-point score). A clean `temper` pass should move this category toward full marks.
+</Tip>
+
+<Note>
+  `temper` detects your active technology profile automatically via `forge profile`. If the detected profile does not match your intended DI strategy, run `forge profile` first to confirm it and adjust if necessary.
+</Note>

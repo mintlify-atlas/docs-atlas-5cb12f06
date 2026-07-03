@@ -1,0 +1,94 @@
+---
+title: "Technology Profiles: 10 Pre-Built Stack Configurations"
+sidebarTitle: "Profiles"
+description: "Forge ships 10 technology profiles covering Express, Fastify, and NestJS combined with MongoDB, PostgreSQL, Prisma, and Drizzle — each defining DI strategy, directory structure, and naming conventions."
+---
+
+A Forge **profile** is a complete description of a technology stack. It tells Forge how your project is wired: which framework handles HTTP, which database and ORM manage persistence, and which dependency injection pattern connects them. Every Forge command — `cast`, `temper`, `inspect`, `quench` — consults the active profile to generate framework-appropriate scaffolding, validate the correct DI annotations, and apply the right naming conventions. Profiles eliminate guesswork: once Forge detects your stack, it operates as a specialist for that stack rather than a generic scaffolder.
+
+## Available Profiles
+
+| Profile | Framework | Database | ORM | DI Strategy |
+|---------|-----------|----------|-----|-------------|
+| `express-mongodb` | Express | MongoDB | Mongoose | tsyringe |
+| `express-postgres` | Express | PostgreSQL | raw pg | Manual |
+| `express-prisma` | Express | PostgreSQL | Prisma | tsyringe |
+| `express-drizzle` | Express | PostgreSQL | Drizzle | tsyringe |
+| `fastify-mongodb` | Fastify | MongoDB | Mongoose | Manual |
+| `fastify-postgres` | Fastify | PostgreSQL | Prisma | Manual |
+| `fastify-prisma` | Fastify | PostgreSQL | Prisma | Manual |
+| `nestjs-mongodb` | NestJS | MongoDB | Mongoose | NestJS DI |
+| `nestjs-postgres` | NestJS | PostgreSQL | Prisma | NestJS DI |
+| `nestjs-prisma` | NestJS | PostgreSQL | Prisma | NestJS DI |
+
+## What a Profile Defines
+
+Each profile is a markdown specification file that covers six dimensions of your stack:
+
+<Steps>
+  <Step title="Directory structure">
+    How `platform/`, `features/`, `shared/`, and `infra/` are organized, including where the ORM client lives (e.g., `src/infrastructure/prisma.ts` for Prisma profiles, `src/infra/mongodb/` for Mongoose profiles).
+  </Step>
+  <Step title="DI setup">
+    Which DI mechanism to use: tsyringe tokens and `container.register()` calls in a per-feature `di.ts`, NestJS `@Module` providers, or explicit manual constructor wiring in a routes file.
+  </Step>
+  <Step title="Routing pattern">
+    How HTTP routing is structured: Express `Router`, Fastify plugin functions, or NestJS `@Controller` + `@Module` declarations.
+  </Step>
+  <Step title="Persistence setup">
+    The exact patterns for Mongoose models (`model()` + schema), Prisma client singleton, raw `pg` Pool, or Drizzle schema — including transaction patterns and repository skeletons.
+  </Step>
+  <Step title="Testing strategy">
+    How to test domain logic and repositories: `describe`/`it` with manual mocks for Express profiles, NestJS `Test.createTestingModule()` for NestJS profiles, and how to handle test databases (Prisma test DB, MongoMemoryServer).
+  </Step>
+  <Step title="Naming conventions">
+    Stack-specific naming rules layered on top of the global conventions — for example, Prisma table names in `snake_case`, Mongoose schema classes in `PascalCase` with plural collections.
+  </Step>
+</Steps>
+
+## Profile Detection
+
+Forge auto-detects the active profile by inspecting the project. You do not need to configure it manually:
+
+<Steps>
+  <Step title="Read package.json dependencies">
+    Forge scans `dependencies` and `devDependencies` for framework identifiers: `express`, `fastify`, `@nestjs/core`.
+  </Step>
+  <Step title="Identify the ORM / database layer">
+    Checks for the presence of `prisma`, `@prisma/client`, `mongoose`, `drizzle-orm`, or `pg` in dependencies. Also looks for a `prisma/schema.prisma` file and Mongoose model files.
+  </Step>
+  <Step title="Match against the 10 known profiles">
+    Combines framework + ORM signals to select the best-fit profile. NestJS always uses NestJS DI regardless of ORM.
+  </Step>
+  <Step title="Synthesize a generic profile if no match">
+    If the stack does not match any of the 10 profiles, Forge synthesizes a generic profile that applies Hexagonal Architecture principles and the four-layer model without framework-specific scaffolding.
+  </Step>
+</Steps>
+
+<Note>
+  Profile detection runs as part of the mandatory boot sequence (`profile.mjs --extended`). You can re-run it at any time with `node .opencode/skills/forge/scripts/profile.mjs --extended` to see which profile is active and why.
+</Note>
+
+## Using the Profile
+
+Once Forge detects your profile, it influences every command in the session:
+
+<Accordion title="cast — Feature scaffolding">
+  `cast` generates all feature artifacts (entity, repository interface, use case, controller, routes, schema) using the profile's templates. For a `nestjs-mongodb` profile, the generated controller uses `@Injectable()` from `@nestjs/common`; for `express-prisma`, it uses `@injectable()` from tsyringe.
+</Accordion>
+
+<Accordion title="temper — DI hardening">
+  `temper` applies the DI pattern prescribed by the profile. For tsyringe profiles it adds `@injectable()` and `@inject(TOKEN)` decorators to use cases, controllers, and repositories. For NestJS profiles it ensures `@Injectable()` is present. For manual profiles it wires constructors in the routes file.
+</Accordion>
+
+<Accordion title="inspect — Architectural audit">
+  The Decorators category (20 pts) in `inspect` validates that the correct DI annotations are present per the profile. An `express-prisma` project is checked for tsyringe decorators; a `nestjs-prisma` project is checked for NestJS `@Injectable()`.
+</Accordion>
+
+<Accordion title="quench — Rule validation">
+  Import convention rules (R10-R12) and layer dependency rules (R1-R9) apply universally across all profiles. Profile-specific rules (e.g., R12b: no `registerSingleton` with Mongoose `model()`) are activated only when the relevant profile is detected.
+</Accordion>
+
+<Tip>
+  If Forge synthesizes a generic profile for your project, all commands still work — the generic profile enforces Hexagonal Architecture and the four-layer model using framework-agnostic patterns. You can run `cast`, `inspect`, and `quench` immediately.
+</Tip>

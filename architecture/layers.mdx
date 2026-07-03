@@ -1,0 +1,242 @@
+---
+title: "Layer Responsibilities: Platform, Features, Shared, Infra"
+sidebarTitle: "Layers"
+description: "Each of Forge's four architectural layers has strict ownership rules. Learn what belongs in Platform, Features, Shared, and Infrastructure and why the separation matters."
+---
+
+Clear layer ownership is the foundation of every Forge-modeled system. When each file knows exactly which layer it belongs to — and every layer has firm rules about what it may import — the architecture stays auditable, the domain stays clean, and new features can be added without touching existing ones. Forge enforces these boundaries automatically: the `quench` and `inspect` commands flag any file that strays outside its designated layer, naming the violated rule and its severity.
+
+---
+
+## Platform — `src/platform/`
+
+Platform is the **technical backbone** of the entire system. It provides the infrastructure glue that every other layer depends on: configuration, HTTP routing, logging, caching, DI container, security middleware, event bus, scheduler, and observability.
+
+### What Platform Contains
+
+```text
+src/platform/
+├── config/            App.config.ts, Env.config.ts, Database.config.ts
+├── database/          Database.config.ts, Connection.ts
+├── http/              Router.ts, Auth.middleware.ts, Error.middleware.ts, RateLimiter.middleware.ts
+├── server/            Server.ts, App.ts
+├── logger/            Logger.config.ts, Logger.service.ts
+├── cache/             Cache.config.ts, Cache.service.ts
+├── security/          Auth.middleware.ts, Encryption.service.ts
+├── events/            EventBus.ts, EventHandler.ts
+├── scheduler/         Scheduler.config.ts, Scheduler.service.ts
+├── observability/     Metrics.ts, Tracing.ts, Health.ts
+└── di/                Container.ts, Tokens.ts, Module.ts
+```
+
+### What Platform Must NOT Contain
+
+Platform must never hold domain entities, use cases, business logic, or any artifact with the suffixes `.entity.ts`, `.uc.ts`, `.mapper.ts`, or `.port.ts`. It must not import from `src/features/`.
+
+| Violation | Rule | Severity |
+|---|---|---|
+| Domain entity in `platform/` | R13 | CRITICAL |
+| Platform imports from a feature | R2 | CRITICAL |
+
+<Warning>
+  **Platform is exclusively technical backbone.** Domain artifacts (`.entity.ts`, `.uc.ts`, `.mapper.ts`, `.port.ts`) inside `platform/` trigger R13 CRITICAL. Any import from `src/features/` triggers R2 CRITICAL. Both violations contaminate the backbone with business logic and are blocked by `forgeSmith` in Cursor before the file is written.
+</Warning>
+
+### Platform Code Example
+
+```typescript
+// src/platform/di/Container.ts
+import { container } from 'tsyringe';
+import { Tokens } from './Tokens.js';
+
+export function configureContainer(): void {
+  // Only technical registrations here — no business logic
+  container.register(Tokens.Logger, { useClass: LoggerService });
+  container.register(Tokens.Cache, { useClass: CacheService });
+}
+```
+
+---
+
+## Features — `src/features/<name>/`
+
+Features are the **vertical slices** that own your business capabilities. Each feature is a self-contained hexagonal unit with its own domain layer, application layer, and adapter layer. Nothing outside the feature directory belongs to the feature; nothing inside imports from another feature directly.
+
+### What a Feature Contains
+
+```text
+src/features/<name>/
+├── domain/
+│   ├── entities/           <Domain>.entity.ts
+│   ├── repositories/       I<Domain>.repository.ts   (interface / port)
+│   ├── errors/             <Domain>NotFound.error.ts
+│   └── events/             <Domain>Created.event.ts
+├── application/
+│   ├── use-cases/          <Action>.uc.ts
+│   │   ├── Create<Domain>.uc.ts
+│   │   ├── Get<Domain>.uc.ts
+│   │   ├── List<Domain>.uc.ts
+│   │   ├── Update<Domain>.uc.ts
+│   │   └── Delete<Domain>.uc.ts
+│   └── mappers/            <Domain>.mapper.ts
+└── adapters/
+    ├── in/http/            <Domain>.controller.ts, <Domain>.routes.ts
+    └── out/persistence/    <Domain>.repository.ts, <Domain>.schema.ts
+```
+
+### What Features Must NOT Do
+
+| Violation | Rule | Severity |
+|---|---|---|
+| Feature imports directly from another feature | R8 | ERROR |
+| Feature imports from `src/infra/` | R1 | CRITICAL |
+| Domain layer imports from `src/infra/` | R5 | CRITICAL |
+| Domain layer imports from `src/platform/` | R6 | CRITICAL |
+
+### Feature Code Example
+
+```typescript
+// src/features/users/application/use-cases/CreateUser.uc.ts
+import { injectable, inject } from 'tsyringe';
+import { IUserRepository } from '../../domain/repositories/IUser.repository.js';
+import { UserMapper } from '../mappers/User.mapper.js';
+import { Tokens } from '@/platform/di/Tokens.js';
+
+@injectable()
+export class CreateUserUseCase {
+  constructor(
+    @inject(Tokens.UserRepository)
+    private readonly userRepository: IUserRepository,
+  ) {}
+
+  async execute(data: CreateUserInput): Promise<UserDTO> {
+    const user = UserMapper.toDomain(data);
+    await this.userRepository.save(user);
+    return UserMapper.toDTO(user);
+  }
+}
+```
+
+<Note>
+  The dependency arrow flows inward: `adapters → application → domain`. The domain layer imports nothing outside itself. Interfaces (ports) live in `domain/repositories/`; their concrete implementations live in `adapters/out/persistence/`.
+</Note>
+
+---
+
+## Shared — `src/shared/`
+
+Shared holds **pure, reusable code** that any layer may import — but Shared itself imports nothing from features or infrastructure. It is the lowest-level dependency in the graph.
+
+### What Shared Contains
+
+```text
+src/shared/
+├── errors/        NotFoundError.ts, ValidationError.ts, ConflictError.ts
+├── contracts/     IPaginatedResponse.ts, IResponse.ts
+├── types/         api.types.ts, user.types.ts
+└── utils/         formatDate.ts, pagination.ts
+```
+
+### What Shared Must NOT Contain
+
+| Violation | Rule | Severity |
+|---|---|---|
+| Shared imports from a feature | R3 | ERROR |
+| Shared imports from `src/infra/` | R4 | ERROR |
+
+Shared must be pure: no framework calls, no ORM references, no HTTP concepts, no business rules tied to a specific domain. If a utility needs a database connection, it does not belong in Shared.
+
+### Shared Code Example
+
+```typescript
+// src/shared/errors/NotFoundError.ts
+export class NotFoundError extends Error {
+  readonly statusCode = 404;
+
+  constructor(resource: string, id?: string) {
+    super(id ? `${resource} with id '${id}' not found` : `${resource} not found`);
+    this.name = 'NotFoundError';
+  }
+}
+```
+
+```typescript
+// src/shared/contracts/IPaginatedResponse.ts
+export interface IPaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+}
+```
+
+---
+
+## Infrastructure — `src/infra/`
+
+Infrastructure contains the **concrete implementations** of every external system your application depends on: databases, caches, email providers, and third-party clients. Each file here implements an interface defined in a feature's domain layer.
+
+### What Infrastructure Contains
+
+```text
+src/infra/
+├── prisma/        Prisma.client.ts, Prisma.service.ts
+├── mongodb/       Mongo.config.ts, <Name>.model.ts
+├── redis/         Redis.config.ts, Redis.service.ts
+├── mail/          Mail.config.ts, Mail.service.ts
+└── s3/            S3.config.ts, S3.service.ts
+```
+
+### What Infrastructure Must NOT Do
+
+| Violation | Rule | Severity |
+|---|---|---|
+| Infra imports from a feature | R7 | WARNING |
+
+Infrastructure implements the ports defined by the domain, but it must not reach back into the feature that defined the port. The dependency flows one way: `feature → (platform →) infra`, never the reverse.
+
+### Infrastructure Code Example
+
+```typescript
+// src/infra/prisma/Prisma.client.ts
+import { PrismaClient } from '@prisma/client';
+
+let client: PrismaClient | null = null;
+
+export function getPrismaClient(): PrismaClient {
+  if (!client) {
+    client = new PrismaClient();
+  }
+  return client;
+}
+```
+
+```typescript
+// src/features/users/adapters/out/persistence/User.repository.ts
+// The concrete implementation lives in the feature's adapter layer and uses infra
+import { injectable } from 'tsyringe';
+import { IUserRepository } from '../../domain/repositories/IUser.repository.js';
+import { UserEntity } from '../../domain/entities/User.entity.js';
+import { getPrismaClient } from '@/infra/prisma/Prisma.client.js';
+
+@injectable()
+export class UserRepository implements IUserRepository {
+  private readonly prisma = getPrismaClient();
+
+  async findById(id: string): Promise<UserEntity | null> {
+    const record = await this.prisma.user.findUnique({ where: { id } });
+    return record ? UserMapper.toDomain(record) : null;
+  }
+
+  async save(user: UserEntity): Promise<void> {
+    await this.prisma.user.create({ data: UserMapper.toPersistence(user) });
+  }
+}
+```
+
+---
+
+<Tip>
+  Run `forge inspect` to audit all four layers at once. The **Layers** category (25 pts) checks import isolation between layers; **Structure** (30 pts) checks that the four domain directories exist and are organized correctly; **Ownership** (20 pts) flags orphans, duplicates, and misplaced components.
+</Tip>

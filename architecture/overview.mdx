@@ -1,0 +1,164 @@
+---
+title: "Architecture Model: Four-Layer Backend System Design"
+sidebarTitle: "Overview"
+description: "Forge models every backend system across four mandatory architectural domains: Platform, Features, Shared, and Infrastructure — with an architecture graph as the source of truth."
+---
+
+Forge treats every backend system as a graph of typed components organized across four mandatory architectural domains. Rather than layering code by technical concern alone, Forge enforces **ownership** at the domain boundary: each module knows exactly where it lives, what it may import, and what may import it. The result is a system that can be audited, scored, and evolved without guesswork — because the architecture graph, not a wiki page, is the source of truth.
+
+## The Four Domains
+
+Every backend modeled by Forge is split into exactly these four domains. No directory outside this structure is recognized as an architectural owner.
+
+| Domain | Directory | Purpose | Examples |
+|---|---|---|---|
+| **Platform** | `src/platform/` | Technical backbone shared globally across the entire system | config, server, logger, cache, DI, security, events, scheduler, observability |
+| **Features** | `src/features/<name>/` | Self-contained business capabilities organized as vertical slices | domain, application, adapters (auth, users, payments) |
+| **Shared** | `src/shared/` | Reusable pure code with zero infrastructure dependencies | errors, contracts, types, utils |
+| **Infrastructure** | `src/infra/` | Concrete implementations of ports defined by the domain | prisma, mongodb, redis, mail |
+
+## Project Directory Structure
+
+The canonical layout Forge bootstraps and validates looks like this:
+
+```text
+src/
+├── platform/          ← Technical backbone (global)
+│   ├── config/            App.config.ts, Env.config.ts
+│   ├── database/          Database.config.ts, Connection.ts
+│   ├── http/              Router.ts, middleware/
+│   ├── server/            Server.ts, App.ts
+│   ├── logger/            Logger.config.ts, Logger.service.ts
+│   ├── cache/             Cache.config.ts, Cache.service.ts
+│   ├── security/          Auth.middleware.ts, Encryption.service.ts
+│   ├── events/            EventBus.ts, EventHandler.ts
+│   ├── scheduler/         Scheduler.config.ts
+│   ├── observability/     Metrics.ts, Tracing.ts, Health.ts
+│   └── di/                Container.ts, Tokens.ts
+│
+├── features/          ← Business capabilities (vertical slices)
+│   └── <name>/
+│       ├── domain/
+│       │   ├── entities/       (<Domain>.entity.ts)
+│       │   ├── repositories/   (I<Domain>.repository.ts)
+│       │   ├── errors/         (<Domain>NotFound.error.ts)
+│       │   └── events/         (<Domain>Created.event.ts)
+│       ├── application/
+│       │   ├── use-cases/      (<Action>.uc.ts)
+│       │   └── mappers/        (<Domain>.mapper.ts)
+│       └── adapters/
+│           ├── in/http/        (<Domain>.controller.ts, <Domain>.routes.ts)
+│           └── out/persistence/(<Domain>.repository.ts, <Domain>.schema.ts)
+│
+├── shared/            ← Reusable pure code (no infra deps)
+│   ├── errors/            NotFoundError.ts, ValidationError.ts
+│   ├── contracts/         IPaginatedResponse.ts
+│   ├── types/             api.types.ts
+│   └── utils/             formatDate.ts, pagination.ts
+│
+└── infra/             ← Concrete implementations
+    ├── prisma/            Prisma.client.ts, Prisma.service.ts
+    ├── mongodb/           Mongo.config.ts
+    ├── redis/             Redis.config.ts, Redis.service.ts
+    └── mail/              Mail.config.ts, Mail.service.ts
+```
+
+## Architecture Graph
+
+The architecture graph is Forge's source of truth. Every file is a **node**; every import is an **edge**. Forge builds this graph during boot and uses it to apply all dependency rules, calculate ownership, and derive system health metrics.
+
+**Six node types** are tracked:
+
+| Node Type | What it Represents |
+|---|---|
+| `platform` | Files inside `src/platform/` |
+| `feature` | Feature directories under `src/features/` |
+| `domain` | Domain artifacts inside a feature's `domain/` |
+| `adapter` | Adapter files inside a feature's `adapters/` |
+| `shared` | Files inside `src/shared/` |
+| `infra` | Files inside `src/infra/` |
+
+Edges are validated against rules R1–R13 (see [Dependency Rules](/architecture/dependency-rules)). From the validated graph, Forge calculates two composite metrics:
+
+- **Risk Score** — a weighted measure of critical and high-severity violations
+- **Dependency Health** — the ratio of valid edges to total edges in the graph
+
+Both metrics appear in the `Graph` category of `forge inspect` (20 points) and are written to `ARCHITECTURE.md` after every audit.
+
+## Boot Sequence
+
+Every Forge operation begins with an identical 9-step sequence before any command logic runs. This guarantees that no action is taken on stale or incomplete context.
+
+```text
+context → armorer → profile → graph → chain → inspect → architecture → execute → architecture
+```
+
+<Steps>
+  <Step title="context">
+    Detect the current stack, discover all platform, feature, shared, and infra directories, read `package.json` and `tsconfig.json`.
+  </Step>
+  <Step title="armorer">
+    Run ownership analysis — identify orphaned files, duplicate components, and misplaced artifacts.
+  </Step>
+  <Step title="profile">
+    Match the detected stack against one of the 10 pre-built technology profiles, or synthesize a generic profile.
+  </Step>
+  <Step title="graph">
+    Build the architecture graph: parse all imports, classify nodes by type, validate edges against R1–R13, compute risk score and dependency health.
+  </Step>
+  <Step title="chain">
+    Build the multi-layer dependency graph, compute topological order, and detect any global dependency cycles.
+  </Step>
+  <Step title="inspect">
+    Run the full architectural audit across all 10 scoring categories (180 points, normalized to 0–100).
+  </Step>
+  <Step title="architecture">
+    Read the current `ARCHITECTURE.md` (pre-execution snapshot).
+  </Step>
+  <Step title="execute">
+    Run the requested command (`cast`, `quench`, `relocate`, etc.) with full context available.
+  </Step>
+  <Step title="architecture (post)">
+    Regenerate and write `ARCHITECTURE.md` with updated metrics, ownership data, and violation list.
+  </Step>
+</Steps>
+
+<Note>
+  The boot sequence uses a cache stored in `.forge/cache/`. If source files under `src/` have not changed since the last run, boot data is reused automatically. Pass `--force` to any command to regenerate the cache.
+</Note>
+
+## Technology Profiles
+
+Forge ships with 10 pre-built technology profiles. During boot, the `profile` step matches your `package.json` dependencies to the correct profile, which then governs DI strategy, controller patterns, persistence setup, and naming conventions.
+
+| Profile | Framework | Database | ORM | DI Strategy |
+|---|---|---|---|---|
+| `express-mongodb` | Express | MongoDB | Mongoose | tsyringe |
+| `express-postgres` | Express | PostgreSQL | raw pg | Manual |
+| `express-prisma` | Express | PostgreSQL | Prisma | tsyringe |
+| `express-drizzle` | Express | PostgreSQL | Drizzle | tsyringe |
+| `fastify-mongodb` | Fastify | MongoDB | Mongoose | Manual |
+| `fastify-postgres` | Fastify | PostgreSQL | Prisma | Manual |
+| `fastify-prisma` | Fastify | PostgreSQL | Prisma | Manual |
+| `nestjs-mongodb` | NestJS | MongoDB | Mongoose | NestJS DI |
+| `nestjs-postgres` | NestJS | PostgreSQL | Prisma | NestJS DI |
+| `nestjs-prisma` | NestJS | PostgreSQL | Prisma | NestJS DI |
+
+Each profile defines directory structure, DI setup, routing conventions, persistence patterns, testing approach, and naming conventions. If no profile matches, Forge synthesizes a generic profile from the detected stack.
+
+## Explore Further
+
+<CardGroup cols={2}>
+  <Card title="Layer Responsibilities" icon="layer-group" href="/architecture/layers">
+    What belongs in Platform, Features, Shared, and Infra — and what is strictly forbidden in each.
+  </Card>
+  <Card title="Dependency Rules" icon="ban" href="/architecture/dependency-rules">
+    All 13 enforced rules (R1–R13) with severity levels and violation examples.
+  </Card>
+  <Card title="Naming Conventions" icon="tag" href="/architecture/naming-conventions">
+    File, class, interface, and artifact naming patterns that power Forge's ownership detection.
+  </Card>
+  <Card title="inspect command" icon="magnifying-glass" href="/commands/inspect">
+    Run a full architectural audit: 10 categories, 180 points, score 0–100.
+  </Card>
+</CardGroup>

@@ -1,0 +1,74 @@
+---
+title: "smelt — Extract Reusable Code to Shared Layer"
+sidebarTitle: "smelt"
+description: "smelt identifies duplicated or cross-cutting code and moves it to src/shared/ — keeping the shared layer clean: pure code only, no business logic, no infrastructure dependencies."
+---
+
+`forge smelt` extracts duplicated or cross-cutting code from your features and consolidates it in `src/shared/` — the one layer in Forge's architecture that every other layer is allowed to import from. When two or more features contain the same error class, type definition, or utility function, leaving that code in place creates hidden coupling: any change to the duplicated code must be applied in multiple places, and the risk of drift grows with every sprint. Smelting the code into `shared/` gives it a single, stable home and makes the dependency explicit and auditable.
+
+## Usage
+
+```bash
+# Via agent natural language: "fundir", "compartir", "mover a shared"
+# Direct invocation:
+forge smelt
+```
+
+## Shared Layer Structure
+
+After smelting, extracted artefacts are placed in the appropriate subdirectory of `src/shared/`:
+
+```text
+src/shared/
+├── errors/      # <Name>Error.ts  (NotFoundError, ValidationError)
+├── contracts/   # I<Name>.ts      (IPaginatedResponse, IResponse)
+├── types/       # <domain>.types.ts  (api.types.ts, user.types.ts)
+└── utils/       # <util>.ts       (formatDate.ts, pagination.ts)
+```
+
+## What Belongs in Shared
+
+| Type | File Pattern | Example |
+|------|-------------|---------|
+| Errors | `<Name>Error.ts` | `NotFoundError.ts`, `ValidationError.ts` |
+| Contracts | `I<Name>.ts` | `IPaginatedResponse.ts`, `IResponse.ts` |
+| Types | `<domain>.types.ts` | `api.types.ts`, `user.types.ts` |
+| Utils | `<util>.ts` | `formatDate.ts`, `pagination.ts` |
+
+Good candidates for `smelt` share three properties: they are **used by two or more features**, they contain **no business logic specific to any single feature**, and they carry **no dependency on infrastructure** (databases, external clients, ORMs).
+
+## What Must NOT Be in Shared
+
+<Warning>
+  The shared layer must remain pure. Violating these constraints introduces architectural violations detectable by `forge quench`:
+
+  - **No business logic** — if a module imports from a feature, it violates **R3** (`shared → feature`), which is an ERROR-level violation.
+  - **No infrastructure dependencies** — if a module imports from `src/infra/`, it violates **R4** (`shared → infra`), also an ERROR-level violation.
+  - **No feature-specific code** — utilities that only make sense in a single domain belong inside that feature's own folder, not in `shared/`.
+
+  If you are unsure whether a module belongs in `shared/` or `platform/`, ask: does it depend on any platform service (logger, config, DI container)? If yes, it belongs in `platform/`, not `shared/`.
+</Warning>
+
+## Smelt Workflow
+
+<Steps>
+  <Step title="Identify candidates">
+    Look for types, interfaces, error classes, or utility functions that appear in more than one feature, or that a feature contains but that have no business-logic dependency.
+  </Step>
+  <Step title="Verify purity">
+    Confirm the candidate has no imports from `src/features/`, `src/infra/`, or `src/platform/`. If it does, it cannot safely live in `shared/`.
+  </Step>
+  <Step title="Move to the correct subdirectory">
+    Place the file in `src/shared/errors/`, `src/shared/contracts/`, `src/shared/types/`, or `src/shared/utils/` according to the table above, using the correct naming convention.
+  </Step>
+  <Step title="Update all imports">
+    Replace every import across features that referenced the old location with the new `src/shared/…` path.
+  </Step>
+  <Step title="Validate">
+    Run `forge quench` to confirm zero R3/R4 violations, then run `forge inspect` to verify the score has not regressed.
+  </Step>
+</Steps>
+
+<Note>
+  After smelting, update `ARCHITECTURE.md` by running `forge inscribe` so the shared layer inventory stays accurate.
+</Note>

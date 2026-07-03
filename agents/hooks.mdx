@@ -1,0 +1,152 @@
+---
+title: "forgeSentinel and forgeSmith: Real-Time Architecture Enforcement"
+sidebarTitle: "Hooks"
+description: "forgeSentinel (PostToolUse) reports architectural violations after each file write. forgeSmith (preToolUse) actively denies writes that introduce CRITICAL or ERROR violations in Cursor."
+---
+
+Forge provides two runtime hooks that bring architecture enforcement directly into your AI agent's edit loop. **forgeSentinel** is a non-blocking reporter: it fires after a file has been written and surfaces any new violations as a reminder, letting the agent correct them in the next step. **forgeSmith** is a write gate: it fires before a file is written and can outright **deny** the operation if the proposed content introduces a CRITICAL or ERROR violation. The two hooks cover different agents and different points in the write lifecycle, but they share the same underlying detection logic, guaranteeing consistent results everywhere.
+
+## forgeSentinel — Violation Reporter
+
+forgeSentinel is a **PostToolUse** hook: it runs after the agent has already written a file. Its job is to analyze the modified file against all active architecture rules (R1-R13) and report any violations as a reminder so the agent can self-correct.
+
+### When It Runs
+
+forgeSentinel fires after any of the following tool invocations:
+
+| Agent | Tool(s) That Trigger the Hook |
+|-------|-------------------------------|
+| Claude Code | `Edit`, `Write`, `MultiEdit` |
+| Codex CLI | `Edit`, `Write`, `apply_patch` |
+| OpenCode | Via SKILL.md system |
+
+### What It Does
+
+<Steps>
+  <Step title="Identifies the modified file">
+    Reads the path of the file that was just written from the tool-use output.
+  </Step>
+  <Step title="Runs violation detection">
+    Invokes the shared detection logic in `forgeSentinel-lib.mjs` against the modified file, checking all rules R1-R13.
+  </Step>
+  <Step title="Reports violations as reminders">
+    If violations are found, they are surfaced as a structured reminder with severity labels (`[CRITICAL]`, `[ERROR]`, `[WARNING]`) and suggested fixes — but the write is **not** blocked.
+  </Step>
+</Steps>
+
+### Invoking Manually
+
+You can run forgeSentinel directly from the command line using the path appropriate for your agent:
+
+<CodeGroup>
+```bash OpenCode
+node .opencode/skills/forge/scripts/forgeSentinel.mjs --reminder
+```
+
+```bash Claude Code
+node .claude/skills/forge/scripts/forgeSentinel.mjs --reminder
+```
+
+```bash Codex CLI
+node .agents/skills/forge/scripts/forgeSentinel.mjs --reminder
+```
+</CodeGroup>
+
+### Shared Detection Library
+
+All forgeSentinel adapters delegate to `forgeSentinel-lib.mjs`, which contains the canonical violation-detection functions:
+
+| Function | Rules Checked |
+|----------|---------------|
+| `checkLayerViolations()` | R1-R9 — layer dependency rules |
+| `checkImportConventions()` | R10-R12 — import format conventions |
+| `checkPlatformForDomain()` | R13 — domain artifacts inside platform/ |
+
+---
+
+## forgeSmith — Write Gate (Cursor Only)
+
+forgeSmith is a **preToolUse** hook available exclusively in Cursor. Unlike forgeSentinel, it intercepts the write **before** it happens and can return a `DENY` decision, preventing the file from being written at all.
+
+### When It Runs
+
+forgeSmith fires in Cursor before any file write operation. It analyzes the proposed file content — not the existing file on disk — for architecture violations.
+
+### What It Does
+
+<Steps>
+  <Step title="Intercepts the proposed write">
+    Receives the full proposed file content before it is committed to disk.
+  </Step>
+  <Step title="Analyzes for CRITICAL and ERROR violations">
+    Runs the same detection logic from `forgeSentinel-lib.mjs` against the proposed content, focusing on rules that produce CRITICAL or ERROR severity.
+  </Step>
+  <Step title="Decides: ALLOW or DENY">
+    If CRITICAL or ERROR violations are found, the write is **denied** and the violations are reported to the agent. If only WARNING-level issues are found, the write proceeds and warnings are reported.
+  </Step>
+</Steps>
+
+### Severity Threshold
+
+| Severity | Violation Examples | forgeSmith Decision |
+|----------|--------------------|---------------------|
+| CRITICAL | R1, R2, R5, R6, R10, R12, R12b, R13 | **DENY** |
+| ERROR | R3, R4, R8, R9, R11 | **DENY** |
+| WARNING | R7 | Allow (report only) |
+
+<Warning>
+  forgeSmith will block file writes that introduce CRITICAL violations. This is by design — it prevents architectural debt from entering the codebase in the first place. If you have an intentional exception (e.g., a migration file or a legacy adapter), use an inline ignore comment rather than disabling the hook globally.
+</Warning>
+
+### Managing the forgeSmith Hook
+
+```bash
+# Enable the forgeSmith hook in Cursor
+node .cursor/skills/forge/scripts/forgeSmith-admin.mjs on
+
+# Disable the forgeSmith hook
+node .cursor/skills/forge/scripts/forgeSmith-admin.mjs off
+
+# Check current hook status
+node .cursor/skills/forge/scripts/forgeSmith-admin.mjs status
+```
+
+---
+
+## Inline Ignores in Hooks
+
+Both forgeSentinel and forgeSmith respect inline ignore comments. If a violation on a specific line is intentional, annotate it and the hook will skip that line:
+
+```typescript
+// forge-ignore-next-line
+import { legacy } from '../infra/legacy.js'; // forgeSentinel won't report this line
+
+// forge-ignore: R1
+import { PrismaClient } from '../../infra/prisma/client.js'; // only R1 is ignored
+
+// forge-ignore: R1, R8
+import { crossFeature } from '../other-feature/domain/Entity.js'; // R1 and R8 ignored
+```
+
+To audit all inline ignores currently in your codebase:
+
+```bash
+forge quench --show-ignores
+```
+
+<Tip>
+  Inline ignores are a per-line escape hatch — they are not a way to suppress entire rule categories. Prefer fixing the structural issue over accumulating ignores.
+</Tip>
+
+---
+
+## Hook Summary
+
+<CardGroup cols={2}>
+  <Card title="forgeSentinel" icon="bell">
+    **PostToolUse** — fires after write. Non-blocking reporter for Claude Code, Codex CLI, and OpenCode. Shared library: `forgeSentinel-lib.mjs`.
+  </Card>
+  <Card title="forgeSmith" icon="shield">
+    **preToolUse** — fires before write. Blocking write gate for Cursor. Denies CRITICAL and ERROR violations before they reach disk.
+  </Card>
+</CardGroup>

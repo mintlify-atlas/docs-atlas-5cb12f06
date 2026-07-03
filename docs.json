@@ -1,72 +1,79 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mintlify Starter Kit",
+  "name": "Forge",
+  "theme": "aspen",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
-  },
-  "favicon": "/favicon.svg",
-  "navigation": {
-    "pages": [
-      {
-        "group": "Getting Started",
-        "pages": [
-          "index",
-          "quickstart"
-        ]
-      }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
+    "primary": "#E85D04",
+    "light": "#FFF3E0",
+    "dark": "#7C2D12"
   },
   "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
     "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://app.mintlify.com"
+      "type": "github",
+      "href": "https://github.com/ronaldjdev/forge"
     }
-  },
-  "contextual": {
-    "options": [
-      "copy",
-      "view",
-      "chatgpt",
-      "claude",
-      "perplexity",
-      "mcp",
-      "cursor",
-      "vscode"
-    ]
   },
   "footer": {
     "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
+      "github": "https://github.com/ronaldjdev/forge"
     }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Architecture Model",
+            "pages": [
+              "architecture/overview",
+              "architecture/layers",
+              "architecture/dependency-rules",
+              "architecture/naming-conventions"
+            ]
+          },
+          {
+            "group": "Commands",
+            "pages": [
+              "commands/forge",
+              "commands/cast",
+              "commands/inspect",
+              "commands/quench",
+              "commands/chain",
+              "commands/inscribe",
+              "commands/assay",
+              "commands/smelt",
+              "commands/temper",
+              "commands/relocate-reforge",
+              "commands/utilities"
+            ]
+          },
+          {
+            "group": "Agent Integration",
+            "pages": [
+              "agents/overview",
+              "agents/hooks",
+              "agents/profiles"
+            ]
+          },
+          {
+            "group": "Concepts",
+            "pages": [
+              "concepts/principles",
+              "concepts/patterns",
+              "concepts/di-strategies"
+            ]
+          }
+        ]
+      }
+    ]
   }
 }

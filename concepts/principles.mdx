@@ -1,0 +1,118 @@
+---
+title: "Architectural Principles Behind Forge's Design"
+sidebarTitle: "Principles"
+description: "Forge's 13 dependency rules are grounded in Hexagonal Architecture, Pragmatic DDD, and Vertical Slices. Learn the principles that make these rules necessary and maintainable."
+---
+
+Forge combines three architectural paradigms — **Hexagonal Architecture**, **Pragmatic Domain-Driven Design**, and **Vertical Slices** — into a single enforced discipline. Each paradigm addresses a different axis of complexity: Hexagonal Architecture isolates business logic from technical infrastructure, Pragmatic DDD structures business logic around bounded contexts and rich domain models, and Vertical Slices ensure those bounded contexts own their full stack from HTTP to persistence. Together they produce systems where every component has a single, auditable owner, cross-feature coupling is structurally impossible, and infrastructure can be swapped without touching business logic.
+
+---
+
+## Hexagonal Architecture (Ports & Adapters)
+
+Hexagonal Architecture draws a hard boundary between the **domain** (business rules) and everything outside it (frameworks, databases, external services). The domain expresses its needs through **ports** — interfaces declared in the domain layer. The outside world satisfies those needs through **adapters** — concrete implementations that live at the edge of the system.
+
+**In Forge**, this maps directly to directory structure:
+
+| Hexagonal Concept | Forge Location | Example |
+|-------------------|---------------|---------|
+| Domain | `features/<name>/domain/` | `User.entity.ts`, `IUser.repository.ts` |
+| Inbound adapter (HTTP) | `features/<name>/adapters/in/http/` | `User.controller.ts`, `User.routes.ts` |
+| Outbound adapter (persistence) | `features/<name>/adapters/out/persistence/` | `User.repository.ts`, `User.schema.ts` |
+| Port (repository interface) | `features/<name>/domain/` | `IUser.repository.ts` |
+
+**Why it matters**: the domain layer has zero knowledge of Express, Prisma, MongoDB, or any other technical detail. Use cases can be tested with mock adapters — no database required. Swapping PostgreSQL for MongoDB means writing a new adapter, never touching domain logic.
+
+**Rules enforced**: R5 (`domain → infra` prohibited) and R6 (`domain → platform` prohibited) protect the port boundary. R1 (`feature → infra` prohibited) ensures features go through `infra/` adapters rather than calling the ORM directly.
+
+---
+
+## Pragmatic DDD
+
+Domain-Driven Design provides vocabulary and structure for modeling complex business domains: **entities** (objects with identity and state), **use cases** (application-level orchestration of domain operations), **repositories** (domain interfaces to persistence), and **domain events** (notifications of state changes). Forge adopts these patterns pragmatically — meaning they are applied where they add clarity, not where they add ceremony.
+
+**In Forge**, each feature is a **bounded context** with its own domain, application, and adapter layers:
+
+```text
+src/features/users/
+├── domain/
+│   ├── entities/          ← User.entity.ts (state + invariants)
+│   ├── repositories/      ← IUser.repository.ts (domain interface)
+│   ├── errors/            ← UserNotFound.error.ts (typed domain errors)
+│   └── events/            ← UserCreated.event.ts (domain notifications)
+└── application/
+    └── use-cases/         ← CreateUser.uc.ts (orchestration)
+```
+
+**Key DDD artifacts in Forge**:
+
+<Accordion title="Entities">
+  Entities carry identity (an `id` field) and domain invariants. They are plain TypeScript classes with a static `create()` factory method — no ORM decorators, no framework imports. The entity knows nothing about how it is persisted.
+</Accordion>
+
+<Accordion title="Use Cases">
+  Use cases orchestrate domain operations. A use case receives typed inputs, calls domain methods, delegates persistence to a repository interface, and returns domain objects. They contain the **only** place where business rules are enforced. Controllers never contain business logic.
+</Accordion>
+
+<Accordion title="Repository Interfaces (Ports)">
+  Repository interfaces live in `domain/` and declare the persistence contract in domain terms (`findById`, `save`, `findByEmail`). The implementation lives in `adapters/out/persistence/` and translates between domain objects and ORM records.
+</Accordion>
+
+<Accordion title="Domain Events">
+  Events are named in the past tense (`UserCreated`, `OrderPaid`) and represent facts that have occurred in the domain. They are raised by use cases and consumed by event handlers that may live in other features — without direct cross-feature imports.
+</Accordion>
+
+**"Pragmatic" means**: do not force aggregate roots, value objects, or sagas until the complexity justifies them. A `string` is often better than a `ValueObject<Email>`. A direct method call is often better than a `DomainEvent`. Add DDD scaffolding when the domain logic demands it, not to satisfy a pattern checklist.
+
+---
+
+## Vertical Slices
+
+Vertical Slices organize code by **business capability** rather than by technical layer. Instead of a `controllers/` folder containing all controllers, a `services/` folder containing all services, and a `repositories/` folder containing all repositories, each feature owns all of its layers from top to bottom.
+
+**In Forge**, every `src/features/<name>/` directory is a complete vertical slice:
+
+```text
+src/features/
+├── users/       ← Complete vertical slice: domain + application + adapters
+├── orders/      ← Complete vertical slice: independent of users
+└── payments/    ← Complete vertical slice: independent of orders
+```
+
+**Benefit**: a team that owns the `payments` feature can evolve it — change the domain model, swap the database adapter, add a new use case — without touching any other feature directory. Cross-feature coupling is prohibited by rule (R8: cross-feature direct imports = ERROR), so the only sanctioned communication channel between features is injection via interfaces.
+
+---
+
+## The Four Layers as System-Level Separation
+
+Within the vertical slice model, Forge adds four horizontal layers that handle concerns that span all features:
+
+| Layer | Purpose | Examples |
+|-------|---------|---------|
+| **Platform** | Technical backbone shared by all features | `config/`, `database/`, `http/`, `server/`, `logger/`, `di/`, `security/` |
+| **Features** | Vertical business slices | `users/`, `orders/`, `payments/` |
+| **Shared** | Pure horizontal utilities with no business or infrastructure knowledge | `errors/`, `contracts/`, `types/`, `utils/` |
+| **Infra** | Concrete implementations of ports | `prisma/`, `mongodb/`, `redis/`, `mail/` |
+
+<Warning>
+  **Platform is exclusively a technical backbone.** It must never contain domain entities, use cases, mappers, domain repository interfaces, or any file with business rules. Files with suffixes `.entity.ts`, `.uc.ts`, `.mapper.ts`, or `.port.ts` belong in `src/features/<name>/`, not in `platform/`. Placing domain logic in `platform/` creates an R2 violation (`platform → feature`) and contaminates the backbone with business rules (R13).
+</Warning>
+
+---
+
+## Principle Summary
+
+| Principle | Enforced By | Key Rule |
+|-----------|-------------|----------|
+| Domain isolation | `quench` | R5 (`domain → infra`), R6 (`domain → platform`) |
+| No cross-feature coupling | `quench` | R8 (cross-feature direct imports) |
+| Infrastructure at the edge | `quench` | R1 (`feature → infra`), R7 (`infra → feature`) |
+| Platform stays technical | `quench` | R2 (`platform → feature`), R13 (domain artifacts in platform) |
+| Shared stays pure | `quench` | R3 (`shared → feature`), R4 (`shared → infra`) |
+| Dependency direction | `quench` | R9 (dependency cycles) |
+| Zero business logic in controllers | `inspect` | Decorators category |
+| DI by constructor only | `temper` | Decorators + DI strategy validation |
+
+<Note>
+  These principles are not optional style guidelines — they are the basis for the 13 dependency rules that `quench` enforces automatically on every file change. Violations are reported with CRITICAL, ERROR, or WARNING severity and can block commits via the git pre-commit hook (`forge hook install`).
+</Note>

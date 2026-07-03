@@ -1,0 +1,106 @@
+---
+title: "inspect — Full Architecture Audit with 0–100 Score"
+sidebarTitle: "inspect"
+description: "inspect evaluates your project across 10 categories (180 total points) and returns a normalized 0–100 score with an A–F grade, identifying violations by severity."
+---
+
+`inspect` is Forge's full architecture auditor. It evaluates the entire project against **180 points spread across 10 categories** — structure, layer isolation, DI decorators, ownership, platform completeness, dependency direction, graph health, naming conventions, import rules, and custom project rules — then normalizes the result to a **0–100 score with an A–F grade**. Every violation is reported with a severity level so you know exactly what to fix and in what order. Run `inspect` before pull requests, after major structural changes, or any time you need a definitive picture of your architecture's health.
+
+## Usage
+
+<CodeGroup>
+
+```bash Agent (natural language)
+"inspeccionar"
+"diagnóstico"
+"evaluar"
+```
+
+```bash Direct
+node .opencode/skills/forge/scripts/inspect.mjs
+node .opencode/skills/forge/scripts/inspect.mjs --json
+```
+
+</CodeGroup>
+
+<Tip>
+  Run `inspect --json` for machine-readable output suitable for CI pipelines, dashboards, or piping into external tools.
+</Tip>
+
+## Scoring System
+
+`inspect` evaluates 10 categories for a maximum of **180 raw points**, then normalizes to a **0–100 score**.
+
+| Category | Points | What it Measures |
+|----------|--------|-----------------|
+| Structure | 30 | Organization of platform, features, shared, and infra — every feature must have `domain/`, `application/`, and `adapters/` subdirectories |
+| Layers | 25 | Layer isolation: prohibited imports between layers, business logic in controllers, direct database access outside repositories |
+| Decorators | 20 | Presence of `@injectable()` and `@inject()` in use cases, controllers, and repository implementations (for profiles using tsyringe) |
+| Ownership | 20 | Orphans (components without a clear owner), duplicates (same artifact in multiple places), misplaced components (files in the wrong layer) |
+| Platform | 15 | Technical backbone completeness — config, server, logger, database, DI, and other platform components expected by the active profile |
+| Dependencies | 15 | Dependency direction (allowed vs. prohibited edges), cycles, and invalid graph edges |
+| Graph | 20 | Architecture graph health: risk score, dependency health percentage, and rule violations (R1–R13) |
+| Custom Rules | 5 | Rules defined in `.forge/rules.json` for project-specific architectural constraints |
+| Naming | 10 | PascalCase artifact names, kebab-case directories, correct suffixes (`.entity.ts`, `.uc.ts`, `.repository.ts`, etc.) |
+| Import Conventions | 20 | R10 (no bare specifiers), R11 (`.js` extension in imports), R12 (no `bootstrap.di.js` imports) |
+| **Total** | **180** | **Normalized to 0–100** |
+
+## Grade Scale
+
+| Grade | Score Range | Meaning |
+|-------|-------------|---------|
+| **A** | 90–100 | Solid architecture. All principles upheld. |
+| **B** | 75–89 | Minor inconsistencies. Easy to correct. |
+| **C** | 60–74 | Several violations. Requires structured work. |
+| **D** | 45–59 | Architecture compromised. Migration needed. |
+| **F** | < 45 | Project not yet migrated or widespread violations. |
+
+## Reading the Output
+
+`inspect` produces a color-coded report in the terminal (or structured JSON with `--json`). The output includes:
+
+<CardGroup cols={2}>
+  <Card title="Overall Score & Grade" icon="gauge-high">
+    The normalized 0–100 score and letter grade displayed prominently at the top of the report.
+  </Card>
+  <Card title="Category Breakdown" icon="list-check">
+    Points earned vs. points available for each of the 10 categories, so you can see exactly where the project loses points.
+  </Card>
+  <Card title="Violations by Severity" icon="triangle-exclamation">
+    Every violation listed with its severity (`CRITICAL`, `ERROR`, `WARNING`, `INFO`, `SUGGESTION`), the file and line involved, and the rule being violated.
+  </Card>
+  <Card title="Suggested Next Steps" icon="arrow-right">
+    Forge suggests the most impactful commands to run next based on the violation profile (e.g., `quench --fix`, `temper`, `relocate`).
+  </Card>
+</CardGroup>
+
+### Severity Reference
+
+| Severity | Meaning | Example |
+|----------|---------|---------|
+| `CRITICAL` | Violates a fundamental architectural principle | Domain importing from adapters |
+| `ERROR` | Violates a layer or structure rule | Controller containing business logic |
+| `WARNING` | Inconsistency requiring attention | Feature missing a repository interface |
+| `INFO` | Observation about current state | Incomplete feature scaffold |
+| `SUGGESTION` | Recommended improvement | Use class tokens in `@inject()` |
+
+## Custom Rules
+
+`inspect` includes a **Custom Rules** category (5 points) that evaluates rules defined in `.forge/rules.json` at the project root. This lets you enforce project-specific architectural constraints beyond Forge's built-in 13 rules — for example, naming conventions for your team's specific domain vocabulary or additional layer restrictions.
+
+```json
+// .forge/rules.json
+{
+  "rules": [
+    {
+      "id": "custom-1",
+      "description": "Payment feature must not import from auth feature directly",
+      "severity": "ERROR"
+    }
+  ]
+}
+```
+
+<Note>
+  `inspect` runs automatically as step 6 of Forge's [boot sequence](/commands/forge#boot-sequence). This means every Forge operation already has the latest inspection results available without requiring a separate invocation.
+</Note>

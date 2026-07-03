@@ -1,0 +1,148 @@
+---
+title: "relocate and reforge — Migrate and Refactor Architecture"
+sidebarTitle: "Migrate & Refactor"
+description: "relocate moves legacy code to the correct architectural layer. reforge restructures features and components to resolve violations, extract use cases, and fix dependency cycles."
+---
+
+Real-world backends rarely start clean. Codebases accumulate years of legacy structure — controllers next to database clients, utilities mixed with business logic, configuration scattered across ad-hoc directories. `relocate` and `reforge` are Forge's two migration and refactoring commands: `relocate` surgically moves existing code from a legacy location to its correct architectural layer, while `reforge` performs a broader restructuring that resolves violations, extracts use cases from controllers, fixes cyclic dependencies, and brings a project fully into compliance with Forge's four-layer model.
+
+---
+
+## relocate — Migrate Legacy Code
+
+`relocate` is the targeted migration tool. It classifies code by its nature and moves it to the correct layer: Platform, Features, Shared, or Infrastructure.
+
+```bash
+# Via agent natural language: "trasladar", "mover"
+# Direct invocation:
+forge relocate
+```
+
+### Migration Targets
+
+| Code Type | Target Layer | Example Destination |
+|-----------|-------------|---------------------|
+| Config, server, logger, DI | Platform | `src/platform/config/` |
+| Business logic, entities, use cases | Features | `src/features/<name>/` |
+| Reusable pure code, utils, types | Shared | `src/shared/utils/` |
+| DB clients, external services, ORMs | Infra | `src/infra/prisma/` |
+
+### How relocate Works
+
+<Steps>
+  <Step title="Backup">
+    Forge automatically creates a backup checkpoint before making any changes. You can restore it at any time with `forge rollback`.
+  </Step>
+  <Step title="Classify">
+    Identify the component and determine its correct layer based on its nature (see the table above). The critical rule: **never place domain logic in `src/platform/`**. If a file contains entities, use cases, business rules, or imports from `src/features/`, it belongs in a feature — not in platform.
+  </Step>
+  <Step title="Create target structure">
+    Build the destination directory structure for the chosen layer according to Forge's naming conventions.
+  </Step>
+  <Step title="Migrate files">
+    Move the files, keeping the logic intact. Update all import paths in the rest of the codebase to point to the new locations.
+  </Step>
+  <Step title="Clean up legacy structure">
+    This step is mandatory. After relocating, remove all artefacts that belonged to the old structure:
+    - Old files in legacy directories (`src/application/`, `src/domain/`, `src/adapters/`, `src/setting/`, etc.)
+    - Empty `index.ts` barrel files that only re-exported legacy code
+    - Empty directories left over after the migration
+    
+    Do not leave orphaned files or broken imports.
+  </Step>
+  <Step title="Verify">
+    Run `forge armorer` to confirm ownership is healthy (zero orphans, zero duplicates), then run `forge quench` to verify zero rule violations.
+  </Step>
+</Steps>
+
+### Layer Classification Reference
+
+| Component | Correct Layer |
+|-----------|--------------|
+| App config, environment variables | `src/platform/config/` |
+| HTTP middleware, router, guards | `src/platform/http/` |
+| DB connections, Redis client, mail client | `src/infra/` |
+| Pure utilities (no business rules) | `src/shared/utils/` |
+| Domain entities, value objects, events | `src/features/<name>/domain/` |
+| Use cases, application services | `src/features/<name>/application/` |
+| Controllers, persistence adapters, schemas | `src/features/<name>/adapters/` |
+
+<Note>
+  If the migration introduces violations (R1–R9), Forge can restore your project automatically. Use `forge rollback list` to see available checkpoints and `forge rollback restore <id>` to revert.
+</Note>
+
+---
+
+## reforge — Refactor Architecture
+
+`reforge` is the comprehensive refactoring command. Where `relocate` moves a single component, `reforge` evaluates the entire project across all four layers and executes all the corrections needed to reach a clean architectural state.
+
+```bash
+# Via agent natural language: "refactorizar", "rediseñar"
+# Direct invocation:
+forge reforge
+```
+
+### What reforge Does
+
+`reforge` operates across all four architectural layers in a single pass:
+
+- **Extracts business logic** from controllers into properly structured use cases in `src/features/<name>/application/use-cases/`
+- **Moves orphaned components** to their correct layer based on their nature and dependency graph
+- **Resolves cyclic dependencies** (R9) and any other active R1–R9 violations
+- **Migrates code between layers** when a component has been placed in the wrong domain
+- **Auto-fixes naming violations** (with user confirmation): renames files to match `<PascalCase>.<artefact>.ts` conventions and updates all imports
+
+### reforge Flags
+
+| Flag | Effect |
+|------|--------|
+| `--dry-run` | Preview all naming violations without making any changes |
+| `--fix-naming` | Correct naming violations automatically without prompting |
+| `--skip-naming` | Skip naming detection and correction entirely |
+
+### Post-reforge Steps
+
+<Steps>
+  <Step title="Clean up legacy structure">
+    After `reforge` completes, remove any remaining legacy artefacts: old files at their original locations, barrel files (`index.ts`) that only exported migrated code, and empty directories. Do not leave orphans or broken imports.
+  </Step>
+  <Step title="Verify ownership">
+    Run `forge armorer` to confirm the ownership report shows zero orphans, zero duplicates, and zero misplaced components.
+  </Step>
+  <Step title="Validate rules">
+    Run `forge quench` to confirm zero R1–R12 violations.
+  </Step>
+  <Step title="Confirm score improvement">
+    Run `forge inspect` to verify the architecture score has improved. Also run `forge chain` to confirm no new dependency cycles were introduced.
+  </Step>
+</Steps>
+
+### Single-File Rename Mode
+
+`reforge` can also operate on a single file to rename it according to naming conventions without performing a full refactor:
+
+```bash
+forge reforge src/features/users/domain/userEntity.ts
+```
+
+This renames the file, updates all imports across the project, and runs `forge quench` to validate — without creating a backup or touching any other files.
+
+```text
+Renaming:
+  src/features/users/domain/userEntity.ts
+  → src/features/users/domain/User.entity.ts
+  Rule: feature/users/domain: <Name>.entity.ts
+
+✓ File renamed: userEntity.ts → User.entity.ts
+✓ Imports updated in 3 file(s):
+     src/features/users/application/use-cases/CreateUser.uc.ts
+     src/features/users/application/mappers/User.mapper.ts
+     src/features/users/adapters/in/http/User.controller.ts
+```
+
+---
+
+<Warning>
+  Both `relocate` and `reforge` make significant, wide-ranging changes to your codebase — moving files, rewriting imports, and removing legacy structure. **Always ensure you have a clean git state before running either command.** Forge creates a checkpoint automatically, but having an uncommitted working tree makes rollback and diffing much harder.
+</Warning>

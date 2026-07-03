@@ -1,0 +1,212 @@
+---
+title: "Dependency Injection Strategies by Technology Profile"
+sidebarTitle: "DI Strategies"
+description: "Forge supports three dependency injection strategies — tsyringe decorator-based, NestJS built-in DI, and manual constructor injection — selected automatically by your technology profile."
+---
+
+Dependency injection is the mechanism that makes Hexagonal Architecture testable. Without it, use cases would construct their own repositories, controllers would reach directly for ORM clients, and the domain would become tangled with infrastructure. Forge enforces **constructor injection** as the universal pattern — no service locators, no `container.resolve()` inside business logic, no singleton globals. The specific container (or lack of one) varies by technology profile, but the principle is always the same: dependencies flow in through the constructor, declared as interfaces, with concrete implementations wired at the composition root. Forge auto-selects the strategy that fits your detected profile so `cast`, `temper`, and `inspect` all generate and validate the correct annotations for your stack.
+
+---
+
+## tsyringe DI
+
+tsyringe is the DI container used by Express and mixed Fastify profiles. It uses TypeScript decorators (`@injectable()`, `@inject()`) on classes and a per-feature `di.ts` file as the composition root for that slice.
+
+**Profiles using tsyringe**: `express-mongodb`, `express-prisma`, `express-drizzle`, `fastify-prisma`
+
+### Token Pattern
+
+Each feature defines its own `TOKENS` symbol map and registers its classes with the tsyringe container in a `di.ts` file:
+
+```typescript
+// src/features/users/di.ts
+import { container } from 'tsyringe';
+import { CreateUserUseCase } from './application/use-cases/CreateUser.uc.js';
+import { UserRepository } from './adapters/out/persistence/User.repository.js';
+
+export const TOKENS = {
+  UserRepository: Symbol('UserRepository'),
+  CreateUser: Symbol('CreateUser'),
+} as const;
+
+container.register(TOKENS.UserRepository, { useClass: UserRepository });
+container.register(TOKENS.CreateUser, { useClass: CreateUserUseCase });
+```
+
+### Class Annotations
+
+Use cases, controllers, and repositories all carry `@injectable()` and constructor-parameter `@inject()` annotations:
+
+```typescript
+// src/features/users/application/use-cases/CreateUser.uc.ts
+import { injectable, inject } from 'tsyringe';
+import { TOKENS } from '../../di.js';
+import { IUserRepository } from '../../domain/repositories/IUser.repository.js';
+
+@injectable()
+export class CreateUserUseCase {
+  constructor(
+    @inject(TOKENS.UserRepository)
+    private readonly userRepository: IUserRepository,
+  ) {}
+}
+```
+
+### Mongoose Special Case (R12b)
+
+When using Mongoose with tsyringe, register models using `{ useValue: model(...) }` — **not** `registerSingleton`. Using `registerSingleton` with `model()` is a **CRITICAL** violation (R12b) because Mongoose model registration is not idempotent and will throw on repeated calls.
+
+```typescript
+// ✅ Correct — useValue for Mongoose models
+import { model } from 'mongoose';
+import { UserSchema } from './adapters/out/persistence/User.schema.js';
+
+container.register(TOKENS.UserModel, {
+  useValue: model('User', UserSchema),
+});
+```
+
+```typescript
+// ❌ Wrong — R12b CRITICAL violation
+container.registerSingleton(TOKENS.UserModel, model('User', UserSchema));
+```
+
+---
+
+## NestJS Built-In DI
+
+NestJS profiles use the framework's native dependency injection system. No external container is needed — NestJS manages the module tree and injects providers automatically.
+
+**Profiles using NestJS DI**: `nestjs-mongodb`, `nestjs-postgres`, `nestjs-prisma`
+
+### Module Structure
+
+Each feature declares its providers in a NestJS `@Module`. The module exports providers that other modules may need to consume:
+
+```typescript
+// src/features/users/users.module.ts
+import { Module } from '@nestjs/common';
+import { UserController } from './adapters/in/http/User.controller.js';
+import { CreateUserUseCase } from './application/use-cases/CreateUser.uc.js';
+import { UserRepository } from './adapters/out/persistence/User.repository.js';
+
+@Module({
+  controllers: [UserController],
+  providers: [CreateUserUseCase, UserRepository],
+})
+export class UsersModule {}
+```
+
+### Class Annotations
+
+Use `@Injectable()` from `@nestjs/common` on all providers, and `@Inject()` for constructor parameter injection when needed:
+
+```typescript
+// src/features/users/application/use-cases/CreateUser.uc.ts
+import { Injectable, Inject } from '@nestjs/common';
+import { IUserRepository } from '../../domain/repositories/IUser.repository.js';
+
+@Injectable()
+export class CreateUserUseCase {
+  constructor(
+    @Inject('IUserRepository')
+    private readonly userRepository: IUserRepository,
+  ) {}
+
+  async execute(email: string, name: string): Promise<User> {
+    const user = User.create(email, name);
+    await this.userRepository.save(user);
+    return user;
+  }
+}
+```
+
+### Mongoose Integration (NestJS)
+
+For `nestjs-mongodb`, Mongoose schemas are registered using `MongooseModule.forFeature()` inside a persistence sub-module:
+
+```typescript
+// src/features/users/adapters/out/persistence/UserPersistence.module.ts
+import { Module } from '@nestjs/common';
+import { MongooseModule } from '@nestjs/mongoose';
+import { UserSchema } from './User.schema.js';
+import { UserRepository } from './User.repository.js';
+
+@Module({
+  imports: [
+    MongooseModule.forFeature([{ name: 'User', schema: UserSchema }]),
+  ],
+  providers: [{ provide: 'IUserRepository', useClass: UserRepository }],
+  exports: ['IUserRepository'],
+})
+export class UserPersistenceModule {}
+```
+
+---
+
+## Manual Constructor Injection
+
+Some profiles — particularly smaller Express and Fastify stacks — use no DI container at all. Dependencies are passed explicitly through constructors, wired at the composition root (the routes file or the application entry point).
+
+**Profiles using manual injection**: `express-postgres`, `fastify-mongodb`, `fastify-postgres`
+
+### Wiring at the Routes Level
+
+The routes file instantiates the full dependency chain and passes it to the controller:
+
+```typescript
+// src/features/users/adapters/in/http/User.routes.ts
+import { Router } from 'express';
+import { UserRepository } from '../../out/persistence/User.repository.js';
+import { CreateUserUseCase } from '../../../application/use-cases/CreateUser.uc.js';
+import { UserController } from './User.controller.js';
+
+const repository = new UserRepository();
+const createUser = new CreateUserUseCase(repository);
+const controller = new UserController(createUser);
+
+export const userRouter = Router();
+userRouter.post('/', (req, res) => controller.createHandler(req, res));
+```
+
+### Class Definitions (No Decorators)
+
+Classes are plain TypeScript without DI decorators — the dependency is simply a constructor parameter:
+
+```typescript
+// src/features/users/application/use-cases/CreateUser.uc.ts
+import { IUserRepository } from '../../domain/repositories/IUser.repository.js';
+import { User } from '../../domain/entities/User.entity.js';
+
+export class CreateUserUseCase {
+  constructor(private readonly userRepository: IUserRepository) {}
+
+  async execute(email: string, name: string): Promise<User> {
+    const user = User.create(email, name);
+    await this.userRepository.save(user);
+    return user;
+  }
+}
+```
+
+<Note>
+  Manual injection is perfectly valid for small-to-medium projects (under ~10 features). Forge's `temper` command will not add tsyringe decorators to a manual-injection profile — it applies the wiring pattern appropriate for your detected profile.
+</Note>
+
+---
+
+## Hardening DI with `forge temper`
+
+The `temper` command applies the DI pattern prescribed by the active profile across all feature files in the project:
+
+- **tsyringe profiles**: adds `@injectable()` to classes missing it, adds `@inject(TOKEN)` to constructor parameters, and registers missing tokens in `di.ts`
+- **NestJS profiles**: ensures `@Injectable()` is present on all providers and validates `@Module` provider arrays
+- **Manual profiles**: verifies that constructors accept interfaces (not concrete classes) and that wiring happens at the composition root
+
+```bash
+forge temper
+```
+
+<Tip>
+  Use `forge inspect` to check the **Decorators** category (20 pts). It validates that use cases, controllers, and repositories carry the correct DI annotations for your active profile. A score below 15/20 in this category is a strong signal to run `forge temper`.
+</Tip>

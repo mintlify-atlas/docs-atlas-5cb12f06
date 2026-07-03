@@ -1,0 +1,136 @@
+---
+title: "Utility Commands: state, hook, rollback, nail, and update"
+sidebarTitle: "Utilities"
+description: "Forge utility commands for managing persistent state, git pre-commit hooks, project checkpoints, navigation shortcuts, and version updates."
+---
+
+Forge's utility commands handle the scaffolding of a healthy day-to-day workflow: persisting audit results so you can track architectural health over time, guarding every git commit with automated rule validation, creating safe restore points before destructive operations, pinning frequently-visited paths for quick navigation, and keeping the tool itself up to date. None of these commands change your source code directly — they support and protect the work that the core commands do.
+
+---
+
+<Accordion title="forge state — Persistent Audit State">
+
+`forge state` reads and displays the audit state that Forge persists to `.forge/` after each `forge inspect` run. Because architecture health changes incrementally across sprints, the state store gives you a lightweight history of score, grade, and violations without re-running a full audit.
+
+```bash
+forge state           # Last score, grade, and violation count
+forge state --show    # Full detailed state
+forge state --json    # JSON output
+forge state --history # Full audit history
+```
+
+**What is stored:** After every `forge inspect`, Forge writes the score (0–100), grade (A–F), violation list, and timestamp to `.forge/`. This file is checked in to version control so your team shares the same baseline.
+
+**`--history`** lists every recorded audit in chronological order — useful for spotting regressions after a major refactor or dependency upgrade.
+
+</Accordion>
+
+<Accordion title="forge hook — Git Pre-Commit Hook">
+
+`forge hook` installs and manages a git pre-commit hook that validates staged files against Forge's architectural rules before each commit. The hook runs `detect.mjs` on every staged `.ts`, `.js`, `.mjs`, `.tsx`, and `.jsx` file under `src/`. If any staged file introduces a **CRITICAL** or **ERROR** violation, the commit is blocked and the violation details are printed inline.
+
+```bash
+forge hook install    # Install the git pre-commit hook
+forge hook status     # Show whether the hook is installed
+forge hook check      # Manually validate staged files right now
+forge hook uninstall  # Remove the hook
+```
+
+**Additional hook management:**
+
+```bash
+forge hook ignore R1          # Suppress a specific rule in the hook
+forge hook unignore R1        # Re-enable a previously ignored rule
+forge hook list-ignored       # List all rules currently ignored by the hook
+```
+
+Ignored rules are persisted to `.forge/hooks-ignore.json`:
+
+```json
+{ "ignored": ["R1", "R7"] }
+```
+
+<Note>
+  The hook blocks commits but does **not** prevent bypassing with `git commit --no-verify`. Use `forge hook status` regularly to confirm the hook is still installed — particularly after cloning on a new machine, since git hooks are not versioned.
+</Note>
+
+**Configuration files created by the hook:**
+
+| File | Purpose |
+|------|---------|
+| `.git/hooks/pre-commit` | The hook script itself |
+| `.forge/hooks-ignore.json` | List of rules the hook should not block on |
+
+</Accordion>
+
+<Accordion title="forge rollback — Restore Checkpoints">
+
+Before executing any destructive operation — `relocate`, `reforge`, `temper`, `smelt` — Forge automatically creates a checkpoint of your project state. `forge rollback` lets you restore your project to any of those saved checkpoints if a refactoring goes wrong or the architecture score regresses unexpectedly.
+
+```bash
+forge rollback                    # Restore to the last checkpoint
+forge rollback --list             # List all available checkpoints
+forge rollback --id <checkpoint>  # Restore to a specific checkpoint by ID
+```
+
+Checkpoints are stored in `.forge/backups/<target>--<timestamp>/` and preserve the full original directory structure of the migrated code.
+
+**Typical rollback workflow after a failed migration:**
+
+<Steps>
+  <Step title="List checkpoints">
+    ```bash
+    forge rollback --list
+    ```
+  </Step>
+  <Step title="Identify the correct restore point">
+    Note the checkpoint ID from the list that corresponds to the state before the failed operation.
+  </Step>
+  <Step title="Restore">
+    ```bash
+    forge rollback --id <checkpoint-id>
+    ```
+  </Step>
+  <Step title="Verify">
+    Run `forge quench` and `forge inspect` to confirm the project is back to its pre-operation state.
+  </Step>
+</Steps>
+
+</Accordion>
+
+<Accordion title="nail / unnail — Navigation Shortcuts">
+
+`nail` and `unnail` are navigation utilities that pin frequently-used project paths as named shortcuts, so you (and your AI agent) can navigate to key directories without typing full paths.
+
+```bash
+nail src/features/auth     # Create shortcut named "auth"
+nail src/platform/config   # Create shortcut named "config"
+nail --list                # List all active shortcuts
+unnail auth                # Remove the "auth" shortcut
+```
+
+Shortcuts are stored in `.forge/` and are available across agent sessions. They are particularly useful for large monorepos where feature paths are long and repetitive.
+
+<Note>
+  `nail` uses the last segment of the path as the shortcut name by default. Use `nail --list` to see all currently pinned shortcuts at a glance.
+</Note>
+
+</Accordion>
+
+<Accordion title="forge update — Check for Updates">
+
+`forge update` checks whether a newer version of the `@ronaldjdevfs/forge` package is available on npm and reports the current and latest versions.
+
+```bash
+forge update
+```
+
+If a newer version is available, the command prints upgrade instructions. No automatic installation is performed — you remain in control of when to upgrade.
+
+</Accordion>
+
+---
+
+<Tip>
+  Run `forge hook install` in every project the moment Forge is set up. The pre-commit hook is the last line of defence against architectural violations reaching your main branch — it works silently in the background even when no AI agent is running, ensuring every human commit is validated against R1–R12 before it lands.
+</Tip>

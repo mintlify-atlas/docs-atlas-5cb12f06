@@ -1,0 +1,244 @@
+---
+title: "Code Patterns: Entities, Use Cases, Repositories, and Adapters"
+sidebarTitle: "Patterns"
+description: "Learn the canonical code patterns for every Forge artifact type — entities, use cases, repository interfaces, error types, events, HTTP adapters, and persistence adapters."
+---
+
+Forge enforces specific, consistent code patterns for every artifact it generates. This consistency is not stylistic preference — it is what makes automated analysis possible. When `inspect` checks Decorators, it knows exactly where `@injectable()` should appear. When `forgeSentinel` analyzes a modified file, it knows the canonical import path structure. When `quench` reports an R8 cross-feature violation, it has a reliable way to identify which layer a file belongs to. The patterns below are the ground truth for every file Forge generates via `cast`, and the baseline that `inspect`, `quench`, and the runtime hooks measure against.
+
+---
+
+## Artifact Patterns
+
+<Tabs>
+  <Tab title="Entity">
+    Domain entities are plain TypeScript classes. They carry identity (`id`), domain state, and invariants. They have no ORM decorators, no framework imports, and no knowledge of how they are persisted. A static `create()` factory encapsulates construction logic.
+
+    ```typescript
+    // src/features/users/domain/entities/User.entity.ts
+    export class User {
+      constructor(
+        public readonly id: string,
+        public readonly email: string,
+        public readonly name: string,
+        public readonly createdAt: Date,
+      ) {}
+
+      static create(email: string, name: string): User {
+        return new User(crypto.randomUUID(), email, name, new Date());
+      }
+    }
+    ```
+
+    **Naming**: `<Domain>.entity.ts` — `User.entity.ts`, `Order.entity.ts`  
+    **Location**: `src/features/<name>/domain/entities/`
+  </Tab>
+  <Tab title="Repository Interface">
+    Repository interfaces (ports) live in the domain layer. They declare the persistence contract in pure domain terms. No ORM types, no database concepts.
+
+    ```typescript
+    // src/features/users/domain/repositories/IUser.repository.ts
+    import { User } from '../entities/User.entity.js';
+
+    export interface IUserRepository {
+      findById(id: string): Promise<User | null>;
+      findByEmail(email: string): Promise<User | null>;
+      save(user: User): Promise<void>;
+    }
+    ```
+
+    **Naming**: `I<Domain>.repository.ts` — `IUser.repository.ts`  
+    **Location**: `src/features/<name>/domain/repositories/`
+  </Tab>
+  <Tab title="Use Case">
+    Use cases are the sole orchestrators of business logic. They accept typed inputs, call domain methods, delegate to repository interfaces, and return domain objects. They never handle HTTP concerns or know about response status codes.
+
+    ```typescript
+    // src/features/users/application/use-cases/CreateUser.uc.ts
+    import { injectable, inject } from 'tsyringe';
+    import { TOKENS } from '../../di.js';
+    import { IUserRepository } from '../../domain/repositories/IUser.repository.js';
+    import { User } from '../../domain/entities/User.entity.js';
+
+    @injectable()
+    export class CreateUserUseCase {
+      constructor(
+        @inject(TOKENS.UserRepository)
+        private readonly userRepository: IUserRepository,
+      ) {}
+
+      async execute(email: string, name: string): Promise<User> {
+        const user = User.create(email, name);
+        await this.userRepository.save(user);
+        return user;
+      }
+    }
+    ```
+
+    **Naming**: `<Action>.uc.ts` — `CreateUser.uc.ts`, `GetUser.uc.ts`, `DeleteUser.uc.ts`  
+    **Location**: `src/features/<name>/application/use-cases/`
+
+    <Note>
+      The DI decorator (`@injectable()` / `@inject()`) depends on your technology profile. For NestJS profiles, use `@Injectable()` and `@Inject()` from `@nestjs/common`. For manual injection profiles, remove the decorators and accept dependencies as plain constructor parameters.
+    </Note>
+  </Tab>
+  <Tab title="Domain Error">
+    Domain errors are typed classes, never generic `throw new Error()` calls. Feature-specific errors extend shared base error classes and live in the feature's domain layer.
+
+    ```typescript
+    // src/features/users/domain/errors/UserNotFound.error.ts
+    import { NotFoundError } from '@/shared/errors/NotFoundError.js';
+
+    export class UserNotFoundError extends NotFoundError {
+      constructor(id: string) {
+        super(`User with id ${id} not found`);
+      }
+    }
+    ```
+
+    The shared base errors live in `src/shared/errors/`:
+
+    ```typescript
+    // src/shared/errors/NotFoundError.ts
+    export class NotFoundError extends Error {
+      constructor(message: string) {
+        super(message);
+        this.name = 'NotFoundError';
+      }
+    }
+    ```
+
+    **Naming**: `<Domain>NotFound.error.ts`, or more generally `<Domain><Condition>.error.ts`  
+    **Location (feature-specific)**: `src/features/<name>/domain/errors/`  
+    **Location (shared)**: `src/shared/errors/`
+  </Tab>
+  <Tab title="HTTP Controller">
+    HTTP controllers are inbound adapters. They parse the request, invoke a use case, and format the response. No business logic, no database access, no domain decisions.
+
+    ```typescript
+    // src/features/users/adapters/in/http/User.controller.ts
+    import { injectable, inject } from 'tsyringe';
+    import { TOKENS } from '../../di.js';
+    import { CreateUserUseCase } from '../../../application/use-cases/CreateUser.uc.js';
+    import type { Request, Response } from 'express';
+
+    @injectable()
+    export class UserController {
+      constructor(
+        @inject(TOKENS.CreateUser)
+        private readonly createUser: CreateUserUseCase,
+      ) {}
+
+      async createHandler(req: Request, res: Response): Promise<void> {
+        const user = await this.createUser.execute(req.body.email, req.body.name);
+        res.status(201).json(user);
+      }
+    }
+    ```
+
+    **Naming**: `<Domain>.controller.ts` — `User.controller.ts`  
+    **Location**: `src/features/<name>/adapters/in/http/`
+  </Tab>
+  <Tab title="Persistence Adapter">
+    Persistence adapters (outbound adapters) implement the domain's repository interface. They translate between domain objects and ORM records using a mapper.
+
+    ```typescript
+    // src/features/users/adapters/out/persistence/User.repository.ts
+    import { injectable } from 'tsyringe';
+    import { prisma } from '@/infra/prisma/Prisma.client.js';
+    import { IUserRepository } from '../../../domain/repositories/IUser.repository.js';
+    import { User } from '../../../domain/entities/User.entity.js';
+    import { UserMapper } from '../../../application/mappers/User.mapper.js';
+
+    @injectable()
+    export class UserRepository implements IUserRepository {
+      async findById(id: string): Promise<User | null> {
+        const record = await prisma.user.findUnique({ where: { id } });
+        return record ? UserMapper.toDomain(record) : null;
+      }
+
+      async findByEmail(email: string): Promise<User | null> {
+        const record = await prisma.user.findUnique({ where: { email } });
+        return record ? UserMapper.toDomain(record) : null;
+      }
+
+      async save(user: User): Promise<void> {
+        await prisma.user.upsert({
+          where: { id: user.id },
+          update: { email: user.email, name: user.name },
+          create: { id: user.id, email: user.email, name: user.name, createdAt: user.createdAt },
+        });
+      }
+    }
+    ```
+
+    **Naming**: `<Domain>.repository.ts` — `User.repository.ts`  
+    **Location**: `src/features/<name>/adapters/out/persistence/`
+  </Tab>
+  <Tab title="Domain Event">
+    Domain events record facts that have occurred. They are named in the past tense and carry the minimum data needed by consumers.
+
+    ```typescript
+    // src/features/users/domain/events/UserCreated.event.ts
+    export class UserCreatedEvent {
+      public readonly occurredAt: Date;
+
+      constructor(
+        public readonly userId: string,
+        public readonly email: string,
+      ) {
+        this.occurredAt = new Date();
+      }
+    }
+    ```
+
+    **Naming**: `<Domain><Action>.event.ts` — `UserCreated.event.ts`, `OrderPaid.event.ts`  
+    **Tense**: always past tense — `Created`, `Updated`, `Deleted`, `Paid`, never imperative  
+    **Location**: `src/features/<name>/domain/events/`
+  </Tab>
+</Tabs>
+
+---
+
+## Import Rules
+
+All code generated by Forge and all code audited by `quench` must follow these import conventions. Violations are reported as R10, R11, or R12 with ERROR or CRITICAL severity.
+
+<CodeGroup>
+```typescript ✅ Correct — relative with .js extension (R11)
+import { User } from './domain/entities/User.entity.js';
+import { IUserRepository } from '../domain/repositories/IUser.repository.js';
+```
+
+```typescript ✅ Correct — path alias for cross-layer imports
+import { NotFoundError } from '@/shared/errors/NotFoundError.js';
+import { prisma } from '@/infra/prisma/Prisma.client.js';
+```
+
+```typescript ❌ Wrong — bare specifier (R10 violation)
+import { User } from 'domain/entities/User.entity.js';
+import { IUserRepository } from 'features/users/domain/repositories/IUser.repository.js';
+```
+
+```typescript ❌ Wrong — .ts extension in import (R11 violation)
+import { User } from './domain/entities/User.entity.ts';
+```
+
+```typescript ❌ Wrong — importing bootstrap.di.js (R12 CRITICAL)
+import { container } from '../../bootstrap.di.js';
+// Use './di.js' instead
+```
+</CodeGroup>
+
+**Summary of import rules**:
+
+| Rule | Requirement | Severity |
+|------|-------------|----------|
+| R10 | All local imports must use `./`, `../`, or `@/` prefix — no bare specifiers | ERROR |
+| R11 | All local imports must use `.js` extension, never `.ts` or no extension | ERROR |
+| R12 | Never import from `bootstrap.di.js` — use `./di.js` or feature-specific DI file | CRITICAL |
+| R12b | Never use `registerSingleton()` with Mongoose `model()` — use `register({ useValue })` | CRITICAL |
+
+<Note>
+  Forge's `cast` command generates all artifacts following these exact patterns automatically. If you are writing files manually, use `forge quench` to verify import conventions before committing.
+</Note>

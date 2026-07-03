@@ -1,0 +1,173 @@
+---
+title: "Install Forge in Your AI Agent Environment"
+sidebarTitle: "Installation"
+description: "Install Forge via npx to add architecture governance to OpenCode, Claude Code, Cursor, Codex CLI, or Gemini. Requires Node.js 18 or higher."
+---
+
+Installing Forge means deploying the architecture skill into your AI agent's working directory. The installer copies the full skill runtime — scripts, templates, profiles, and reference documentation — into the agent-specific location your agent reads on startup, then wires up the appropriate hook so that rule enforcement happens automatically on every file write. You don't need to configure anything in your project beyond running the install command; the skill loads itself the next time your agent starts a session.
+
+---
+
+## Requirements
+
+- **Node.js 18 or higher** — all skill scripts are pure ESM modules that run directly on Node.js with no build step
+- One or more supported AI coding agents installed in your environment
+
+**Supported agents:**
+
+| Agent | Notes |
+|-------|-------|
+| OpenCode | Primary target — full skill system via SKILL.md |
+| Claude Code | Requires `.claude/` directory |
+| Cursor | Requires `.cursor/` directory |
+| Codex CLI | Uses `.agents/` and `.codex/` directories |
+| Gemini Code Assist | Via `.gemini/` directory |
+
+---
+
+## Interactive Install
+
+The recommended way to install Forge is through the interactive wizard. It detects which agents are installed in your environment, lets you choose one or more, and handles all directory creation, skill copying, hook wiring, and dependency setup automatically.
+
+<CodeGroup>
+
+```bash npx
+npx @ronaldjdevfs/forge install
+```
+
+```bash npm
+npm exec @ronaldjdevfs/forge install
+```
+
+```bash pnpm
+pnpm dlx @ronaldjdevfs/forge install
+```
+
+</CodeGroup>
+
+When you run the wizard without flags, it scans your project and home directory for installed agents, presents a selection prompt, shows a summary of what will be installed, and then executes the installation. Each agent gets its own copy of the skill placed in the correct directory, with hook configuration files rendered for that agent's specific path.
+
+---
+
+## Install for Specific Agents
+
+If you already know which agent you want to target, pass the agent flag directly to skip the wizard entirely.
+
+<Tabs>
+  <Tab title="OpenCode">
+    Installs the skill into `.opencode/skills/forge/` in your project directory, generates `/forge-*` slash commands, and installs the `@opencode-ai/plugin` dependency in `.opencode/`.
+
+    ```bash
+    npx @ronaldjdevfs/forge install --opencode
+    ```
+
+    OpenCode loads skills automatically from `.opencode/skills/` when you open a project. No additional configuration is needed.
+  </Tab>
+  <Tab title="Claude Code">
+    Installs the skill into `.claude/skills/forge/` and configures the `forgeSentinel` PostToolUse hook in `.claude/settings.local.json`. The hook runs after every `Edit`, `Write`, or `MultiEdit` tool call and reports architectural violations as a reminder.
+
+    ```bash
+    npx @ronaldjdevfs/forge install --claude
+    ```
+  </Tab>
+  <Tab title="Cursor">
+    Installs the skill into `.cursor/skills/forge/` and configures the `forgeSmith` preToolUse hook in `.cursor/hooks.json`. Unlike other agents, forgeSmith runs **before** each file write and can deny it if the proposed content introduces CRITICAL or ERROR violations.
+
+    ```bash
+    npx @ronaldjdevfs/forge install --cursor
+    ```
+
+    <Warning>
+      **forgeSmith can deny file writes.** When Cursor attempts to write a file that would introduce a CRITICAL or ERROR architecture violation, forgeSmith will block the write and return the violation details instead. This is intentional — it prevents architectural debt from entering the codebase at source. If you need to bypass this for a legitimate exception, add a `// forge-ignore: R<n>` comment to the relevant import line.
+    </Warning>
+  </Tab>
+  <Tab title="Codex CLI">
+    Installs the skill into `.agents/skills/forge/` and copies `hooks.json` into `.codex/` so Codex CLI picks up the `forgeSentinel` PostToolUse hook. The hook runs after every `Edit`, `Write`, or `apply_patch` tool call.
+
+    ```bash
+    npx @ronaldjdevfs/forge install --codex
+    ```
+  </Tab>
+  <Tab title="Gemini">
+    Installs the skill into `.gemini/skills/forge/`. Gemini does not use a runtime hook; instead, the skill's `SKILL.md` provides architectural instructions that are loaded when the agent starts.
+
+    ```bash
+    npx @ronaldjdevfs/forge install --gemini
+    ```
+  </Tab>
+  <Tab title="All Agents">
+    Installs Forge for every supported agent simultaneously — OpenCode, Claude Code, Cursor, Codex CLI, Gemini, and generic agents. Useful for teams where different developers use different agents on the same project.
+
+    ```bash
+    npx @ronaldjdevfs/forge install --all
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## Global Install
+
+For OpenCode, you can install Forge globally so it is available in every project on your machine without a per-project install step.
+
+```bash
+npx @ronaldjdevfs/forge install --global
+```
+
+This installs the skill to `~/.config/opencode/skills/forge/` rather than `.opencode/skills/forge/` in your current directory. OpenCode will load the global skill for any project that doesn't have a local override.
+
+---
+
+## What Gets Installed
+
+The table below shows exactly where each agent's skill lands, which hook is configured, and how the hook is triggered.
+
+| Agent | Skill Directory | Hook | Hook Type |
+|-------|----------------|------|-----------|
+| **OpenCode** | `.opencode/skills/forge/` | — | Via SKILL.md system (no separate hook file) |
+| **Claude Code** | `.claude/skills/forge/` | `forgeSentinel` | PostToolUse — runs after each Edit/Write/MultiEdit |
+| **Cursor** | `.cursor/skills/forge/` | `forgeSmith` | preToolUse — runs before each write, can deny |
+| **Codex CLI** | `.agents/skills/forge/` | `forgeSentinel` | PostToolUse — runs after each Edit/Write/apply_patch |
+| **Gemini** | `.gemini/skills/forge/` | — | Via SKILL.md (loaded at agent startup) |
+
+In addition to the skill directory, the installer for OpenCode also generates a set of `/forge-*` slash commands in `.opencode/commands/` (for example `/forge-cast`, `/forge-inspect`, `/forge-quench`) so you can invoke any Forge command directly from the OpenCode command palette.
+
+All hooks share the same detection logic from `forgeSentinel-lib.mjs`, so regardless of which agent you use, the rules being enforced are identical.
+
+---
+
+## Verify Installation
+
+After installation, confirm that Forge is active in one of these ways:
+
+**Option 1 — Ask your agent directly:**
+
+Open a session in the project and type:
+
+```
+forge
+```
+
+or
+
+```
+inicializar
+```
+
+Your agent will run the boot sequence and print the project context, profile, and ownership report.
+
+**Option 2 — Run the CLI help:**
+
+```bash
+node .opencode/skills/forge/scripts/inspect.mjs --help
+```
+
+Or, for other agents, replace `.opencode` with the agent's directory (`.claude`, `.cursor`, `.agents`, `.gemini`).
+
+**Option 3 — Check slash commands (OpenCode only):**
+
+Type `/forge` in the OpenCode command palette. You should see the full list of `/forge-*` commands available.
+
+<Note>
+  If you see errors about missing modules or scripts, re-run the install command. The skill directory may be incomplete if the install was interrupted.
+</Note>

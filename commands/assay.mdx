@@ -1,0 +1,88 @@
+---
+title: "assay — Multi-Persona Architecture Review"
+sidebarTitle: "assay"
+description: "assay evaluates your architecture from five distinct expert perspectives: Jeff Bezos, Martin Fowler, a Security Hacker, a Product Manager, and a senior Architect."
+---
+
+`forge assay` produces a qualitative, multi-perspective architectural essay on top of the quantitative data from `forge inspect`. Instead of a single point of view, it convenes five simulated expert personas — each with a different professional lens — and asks every one of them to weigh in on your codebase simultaneously. The result is a richer, more actionable diagnosis than any single audit score can give you: you learn not just *what* is wrong, but *why it matters* from a scalability standpoint, a technical-debt standpoint, a security standpoint, a product standpoint, and a governance standpoint — all at once.
+
+## Usage
+
+```bash
+forge assay                     # Full review (all 5 personas)
+forge assay --persona=bezos     # Only Bezos perspective
+forge assay --persona=fowler    # Only Fowler perspective
+forge assay --persona=hacker    # Only hacker/security perspective
+forge assay --persona=pm        # Only PM perspective
+forge assay --persona=senior    # Only senior architect perspective
+forge assay --save              # Persist results in .forge/assay/
+forge assay --json              # JSON output
+```
+
+## The Five Personas
+
+Each persona targets a distinct area of architectural concern. Running the full assay surfaces blind spots that any single reviewer would miss.
+
+| Persona | Focus |
+|---------|-------|
+| **Jeff Bezos** | Coupling, scalability, team autonomy (API mandate) |
+| **Martin Fowler** | Refactoring, technical debt, microservices vs monoliths |
+| **Hacker** | Security, performance, edge cases, vulnerabilities |
+| **Alex (PM)** | Time-to-market, complexity, technical ROI |
+| **Dr. Carter (Architect)** | Dependency cycles, layer violations, structural health |
+
+<Note>
+  The essay is driven by the last `forge inspect` result. If no prior audit exists, `assay` still runs but with reduced context. For the richest output, always run `forge inspect` first.
+</Note>
+
+## Flags
+
+<CardGroup cols={3}>
+  <Card title="--persona=&lt;id&gt;" icon="user">
+    Filter to a single persona. Valid IDs: `bezos`, `fowler`, `hacker`, `pm`, `senior`.
+  </Card>
+  <Card title="--save" icon="floppy-disk">
+    Persist the full assay report to the `.forge/assay/` directory for later review and comparison.
+  </Card>
+  <Card title="--json" icon="brackets-curly">
+    Emit machine-readable JSON output — useful for tooling, CI pipelines, or dashboards.
+  </Card>
+</CardGroup>
+
+## Saving Results
+
+When you pass `--save`, Forge writes the full report to `.forge/assay/` using a timestamped filename (e.g. `assay-2026-06-25T00-00-00.md`). Results accumulate over time, so you can track how each persona's assessment evolves across sprints or refactoring cycles.
+
+```bash
+forge assay --save              # Saves current assay
+
+# Later, review history
+forge assay history             # List saved assays
+forge assay read assay-2026-06-25T00-00-00.md  # Read a specific saved report
+```
+
+The `.forge/assay/` directory acts as a lightweight architectural journal. Before major decisions — migrating to microservices, introducing a new feature boundary, upgrading an ORM — run `assay --save` so you have a recorded baseline to compare against after the change.
+
+## Recommended Workflow
+
+<Steps>
+  <Step title="Audit first">
+    Run `forge inspect` to get a quantitative score (0–100), violation list, and architecture graph.
+  </Step>
+  <Step title="Run assay">
+    Run `forge assay` to get qualitative analysis from all five personas, grounded in the inspect data.
+  </Step>
+  <Step title="Prioritise">
+    Use the personas' recommendations to decide which fixes deliver the most value. CRITICAL violations flagged by Dr. Carter and Jeff Bezos typically block team autonomy and introduce the highest risk.
+  </Step>
+  <Step title="Refactor">
+    Address findings with `reforge`, `temper`, or `smelt` as appropriate.
+  </Step>
+  <Step title="Repeat">
+    Re-run `forge inspect` followed by `forge assay` to verify improvement and capture the new baseline with `--save`.
+  </Step>
+</Steps>
+
+<Tip>
+  Run `assay` before major architectural decisions — introducing a new service boundary, splitting a monolith, onboarding a new team — to get a balanced view from multiple expert lenses before committing to a direction.
+</Tip>

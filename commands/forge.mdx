@@ -1,0 +1,132 @@
+---
+title: "forge — Initialize and Boot Your Architecture Project"
+sidebarTitle: "forge"
+description: "The forge command runs the mandatory boot sequence: detects your stack, bootstraps platform/shared/infra layers, analyzes ownership, and generates ARCHITECTURE.md."
+---
+
+`forge` is the entry point for every Forge-managed project. It detects your technology stack, bootstraps the mandatory four-layer architecture (`platform/`, `features/`, `shared/`, `infra/`) if those layers don't yet exist, analyzes component ownership, builds the architecture graph, and generates your living `ARCHITECTURE.md`. Run it on a brand-new project to establish the architecture baseline, or on an existing project to re-synchronize Forge's understanding of the codebase after manual changes or a fresh clone.
+
+## Usage
+
+<CodeGroup>
+
+```bash Agent (natural language)
+# Any of these trigger the forge boot:
+"inicializar"
+"setup"
+"empezar"
+```
+
+```bash Direct
+forge
+```
+
+</CodeGroup>
+
+<Note>
+  Every Forge operation — `cast`, `inspect`, `quench`, `chain`, and every other command — runs the boot sequence first to ensure complete context before acting. Running `forge` explicitly is only required when you want to initialize or re-sync the project.
+</Note>
+
+## Boot Sequence
+
+Before any action, Forge runs a **mandatory 9-step boot sequence** that guarantees full architectural context. The sequence is:
+
+```text
+context → armorer → profile → graph → chain → inspect → architecture → execute → architecture
+```
+
+<Steps>
+  <Step title="context — Detect the stack">
+    `context.mjs` scans `package.json`, `tsconfig.json`, and `src/` to detect the framework (Express / Fastify / NestJS), database (MongoDB / PostgreSQL), ORM (Mongoose / Prisma / Drizzle), DI strategy, and the current state of all four architectural layers (platform, features, shared, infra).
+  </Step>
+  <Step title="armorer — Analyze ownership">
+    `armorer.mjs` inspects every component in the project and reports **orphans** (components without a clear owner), **duplicates** (the same artifact defined in multiple places), and **misplaced components** (files that live in the wrong layer). Suggestions for relocation are included.
+  </Step>
+  <Step title="profile — Match technology profile">
+    `profile.mjs` takes the detected stack and matches it against one of Forge's **10 pre-built technology profiles**. If no exact match is found, a generic profile is synthesized. The active profile drives scaffolding templates, DI patterns, ORM conventions, and naming rules for every subsequent operation.
+  </Step>
+  <Step title="graph — Build the architecture graph">
+    `graph.mjs` constructs the architecture graph with **6 node types** (`platform`, `feature`, `shared`, `infra`, `domain`, `adapter`) and evaluates **13 architectural rules (R1–R13)**. The output includes a **risk score** and overall dependency health.
+  </Step>
+  <Step title="chain — Multi-layer dependency analysis">
+    `chain.mjs` builds the full dependency graph across all four layers, computes a **topological sort** (build order), detects **global dependency cycles**, and identifies **illegal dependency chains** — sequences of individually valid edges that together violate architectural intent.
+  </Step>
+  <Step title="inspect — Full architecture audit">
+    `inspect.mjs` runs the complete 180-point audit across **10 categories** and normalizes the result to a **0–100 score with an A–F grade**. Violations are tagged by severity (`CRITICAL`, `ERROR`, `WARNING`, `INFO`, `SUGGESTION`).
+  </Step>
+  <Step title="architecture — Generate ARCHITECTURE.md">
+    `architecture.mjs` creates or updates `ARCHITECTURE.md` in the project root with the current state: tech stack metadata, feature list, ownership report, architecture graph, dependency health, risk score, rule violations, and the latest audit score.
+  </Step>
+  <Step title="execute — Run the requested command">
+    Forge executes the command the user actually requested (e.g., `cast`, `inspect`, `quench`). During a plain `forge` invocation, this step establishes the baseline and suggests next steps based on the project state.
+  </Step>
+  <Step title="architecture — Update ARCHITECTURE.md post-execution">
+    After the command completes, `architecture.mjs` runs again to capture any changes introduced by the execution, keeping `ARCHITECTURE.md` always in sync with the actual project state.
+  </Step>
+</Steps>
+
+The full boot sequence as a reference table:
+
+| Step | Script | What it does |
+|------|--------|--------------|
+| 1 | `context.mjs` | Detects stack, platform, features, shared, infra, project state |
+| 2 | `armorer.mjs` | Ownership: orphans, duplicates, misplaced components |
+| 3 | `profile.mjs` | Matches stack to one of 10 pre-built profiles or synthesizes generic |
+| 4 | `graph.mjs` | Builds architecture graph: 6 node types, 13 rules (R1–R13), risk score |
+| 5 | `chain.mjs` | Multi-layer dependency graph with topological sort |
+| 6 | `inspect.mjs` | Full architecture audit (180 pts → 0–100, grade A–F) |
+| 7 | `architecture.mjs` | Generates/updates `ARCHITECTURE.md` |
+| 8 | _(execute)_ | Runs the user's requested command |
+| 9 | `architecture.mjs` | Updates `ARCHITECTURE.md` post-execution |
+
+## What Gets Created
+
+When `forge` runs on a new project (or when any layer is missing), the following structure is bootstrapped automatically:
+
+<CardGroup cols={2}>
+  <Card title="src/platform/" icon="server">
+    Technical backbone: `config/`, `database/`, `http/`, `server/`, `logger/`, `cache/`, `security/`, `events/`, `scheduler/`, `observability/`, `di/`
+  </Card>
+  <Card title="src/shared/" icon="share-nodes">
+    Pure reusable code: `errors/`, `contracts/`, `types/`, `utils/`
+  </Card>
+  <Card title="src/infra/" icon="database">
+    Concrete implementations: `prisma/`, `mongodb/`, `redis/`, `mail/`
+  </Card>
+  <Card title="ARCHITECTURE.md" icon="file-lines">
+    Living architecture document in the project root, committed to version control alongside your code
+  </Card>
+</CardGroup>
+
+## Technology Detection
+
+Forge auto-detects your framework, database, ORM, and DI strategy by reading `package.json`, `tsconfig.json`, and your source tree. It then selects one of 10 built-in technology profiles — or synthesizes a generic profile if the stack is non-standard.
+
+| Profile | Framework | Database | ORM | DI Strategy |
+|---------|-----------|----------|-----|-------------|
+| `express-mongodb` | Express | MongoDB | Mongoose | tsyringe |
+| `express-postgres` | Express | PostgreSQL | raw pg | Manual |
+| `express-prisma` | Express | PostgreSQL | Prisma | tsyringe |
+| `express-drizzle` | Express | PostgreSQL | Drizzle | tsyringe |
+| `fastify-mongodb` | Fastify | MongoDB | Mongoose | Manual |
+| `fastify-postgres` | Fastify | PostgreSQL | Prisma | Manual |
+| `fastify-prisma` | Fastify | PostgreSQL | Prisma | Manual |
+| `nestjs-mongodb` | NestJS | MongoDB | Mongoose | NestJS DI |
+| `nestjs-postgres` | NestJS | PostgreSQL | Prisma | NestJS DI |
+| `nestjs-prisma` | NestJS | PostgreSQL | Prisma | NestJS DI |
+
+Each profile drives scaffolding templates, DI wiring patterns, persistence conventions, routing setup, testing approach, and import alias rules. If your stack doesn't match any profile, Forge synthesizes a generic profile and reports a `WARNING` so you can fine-tune it.
+
+## Severity Reference
+
+When `forge` initializes a project, it reports the state of each layer:
+
+| Condition | Severity |
+|-----------|----------|
+| No `src/` directory found | ERROR |
+| No `package.json` found | ERROR |
+| Stack doesn't match any profile | WARNING |
+| `ARCHITECTURE.md` missing | INFO |
+| Platform layer absent | SUGGESTION |
+| Key profile dependencies missing | WARNING |
+| Ownership has orphans | WARNING |

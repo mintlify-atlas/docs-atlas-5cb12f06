@@ -1,0 +1,125 @@
+---
+title: "chain — Multi-Layer Dependency Graph Analysis"
+sidebarTitle: "chain"
+description: "chain builds the complete dependency graph across all four layers — platform, features, shared, and infra — with topological ordering and cycle detection."
+---
+
+`chain` builds the complete **multi-layer dependency graph** for your project. It maps every import relationship across all four architectural layers — platform, features, shared, and infra — then computes a **topological sort** (the safe build and migration order), detects **global dependency cycles**, and identifies **isolated components** that have no inbound or outbound connections. Use `chain` before migrating a feature (to understand what it depends on), when diagnosing excessive coupling, or any time you need to reason about the full dependency topology of the system.
+
+## Usage
+
+<CodeGroup>
+
+```bash Agent (natural language)
+"cadena"
+"grafo"
+"acoplamiento"
+```
+
+```bash Direct
+node .opencode/skills/forge/scripts/chain.mjs
+node .opencode/skills/forge/scripts/chain.mjs --json
+```
+
+</CodeGroup>
+
+<Tip>
+  Use `chain --json` to pipe the dependency graph into external visualization tools, custom analysis scripts, or documentation generators.
+</Tip>
+
+## What chain Analyzes
+
+`chain` performs a comprehensive dependency analysis across all layers:
+
+<CardGroup cols={2}>
+  <Card title="Intra-layer dependencies" icon="circle-nodes">
+    Dependencies **within** each layer: components inside `platform/` that depend on each other, use cases that reference domain entities, adapters that reference application services.
+  </Card>
+  <Card title="Cross-layer dependencies" icon="arrows-left-right">
+    Dependencies **between** layers: which features consume which platform components, which adapters use which infra implementations, which cross-feature imports exist (valid or in violation of R8).
+  </Card>
+  <Card title="Topological ordering" icon="sort">
+    The safe **build order** derived from the dependency graph — components with no dependencies first, then components that depend only on already-listed components. Critical for understanding migration sequencing.
+  </Card>
+  <Card title="Global dependency cycles" icon="rotate">
+    Circular dependency chains anywhere in the graph (regardless of layer). Cycles make the topological sort undefined and are reported as **R9 ERROR** violations.
+  </Card>
+  <Card title="Illegal dependency chains" icon="ban">
+    Sequences of individually allowed edges that together violate architectural intent — for example, a path from a feature to infra that passes through a shared component, effectively smuggling a prohibited dependency.
+  </Card>
+  <Card title="Isolated components" icon="circle-dot">
+    Components that have **no inbound or outbound edges** — neither consumed by anything nor consuming anything. Often indicates dead code or a component that was scaffolded but never wired.
+  </Card>
+</CardGroup>
+
+## Output
+
+The `--json` output contains a structured dependency graph object:
+
+```json
+{
+  "nodes": [
+    { "id": "feature:users", "type": "feature", "layer": "features" },
+    { "id": "platform:di", "type": "platform", "layer": "platform" },
+    { "id": "infra:prisma", "type": "infra", "layer": "infra" }
+  ],
+  "edges": [
+    {
+      "source": "feature:users",
+      "target": "platform:di",
+      "type": "allowed"
+    },
+    {
+      "source": "feature:users",
+      "target": "infra:prisma",
+      "type": "violation",
+      "rule": "R1"
+    }
+  ],
+  "topologicalOrder": ["platform:di", "infra:prisma", "feature:users"],
+  "cycles": [],
+  "isolated": ["feature:notifications"]
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `nodes` | All components found, with their layer type |
+| `edges` | Every dependency edge, tagged as `allowed` or `violation` with the violated rule |
+| `topologicalOrder` | Safe build/migration order — components with no dependencies appear first |
+| `cycles` | Array of cycle chains; empty array means the graph is acyclic |
+| `isolated` | Components with no inbound or outbound edges |
+
+## Relationship to inspect
+
+`chain` is not a standalone tool in isolation — it feeds directly into Forge's [architecture audit](/commands/inspect). The dependency data computed by `chain` contributes to two `inspect` scoring categories:
+
+- **Dependencies (15 pts)**: valid vs. invalid edge ratio, direction violations, cycle detection
+- **Graph (20 pts)**: overall graph health, risk score, and rule violations surfaced by the graph engine
+
+When Forge's [boot sequence](/commands/forge#boot-sequence) runs, `chain` executes as step 5 so that every subsequent operation — including `inspect` and `inscribe` — has up-to-date dependency data.
+
+## Dependency Rules Quick Reference
+
+The following dependency directions are **allowed** in the graph:
+
+```text
+feature    → platform   ✅
+feature    → shared     ✅
+platform   → infra      ✅
+adapter    → infra      ✅
+feature    → domain     ✅
+```
+
+The following are **prohibited** and appear as violations in `chain` output:
+
+```text
+feature    → infra      ❌ R1
+platform   → feature    ❌ R2
+shared     → feature    ❌ R3
+shared     → infra      ❌ R4
+domain     → infra      ❌ R5
+domain     → platform   ❌ R6
+infra      → feature    ❌ R7
+feature    → feature    ❌ R8 (direct cross-feature import)
+```

@@ -1,0 +1,165 @@
+---
+title: "Dependency Rules R1–R13: Enforced Architecture Boundaries"
+sidebarTitle: "Dependency Rules"
+description: "Forge enforces 13 architectural dependency rules (R1–R13) with CRITICAL, ERROR, and WARNING severity. Learn which imports are permitted, which are prohibited, and how violations are detected."
+---
+
+Forge's dependency rule system turns architectural intent into automated enforcement. Every import in your codebase is an edge in the architecture graph. During each operation, the `quench` command validates all 13 rules (R1–R13) against every edge, assigning a severity to each violation. This happens automatically — you do not need to configure anything or write custom lint rules. Violations appear in the `quench` output with file path, line number, violated rule, and severity, and they feed directly into the **Layers** (25 pts) and **Import Conventions** (20 pts) categories of `forge inspect`.
+
+---
+
+## Allowed Dependencies
+
+These import directions are explicitly permitted by the architecture model:
+
+| Import Direction | Permitted? | Notes |
+|---|---|---|
+| `feature → platform` | ✅ | Features may use platform services (logger, config, DI tokens) |
+| `feature → shared` | ✅ | Features may use shared errors, contracts, types, and utils |
+| `platform → infra` | ✅ | Platform bootstraps and configures infrastructure clients |
+| `adapter → infra` | ✅ | Feature adapters (persistence) implement domain ports using infra |
+| `feature → domain` (own feature) | ✅ | Application and adapter layers import from their own `domain/` |
+
+## Dependency Rules Table
+
+<Tabs>
+  <Tab title="Layer Rules (R1–R9)">
+
+| Rule | Description | Severity |
+|---|---|---|
+| **R1** | `feature → infra` — A feature layer file directly imports from `src/infra/`. Use a domain port and inject the infra implementation instead. | CRITICAL |
+| **R2** | `platform → feature` — A platform file imports from `src/features/`. Platform must not know about any business feature. | CRITICAL |
+| **R3** | `shared → feature` — A shared file imports from `src/features/`. Shared must be pure and direction-agnostic. | ERROR |
+| **R4** | `shared → infra` — A shared file imports from `src/infra/`. Shared must have zero infrastructure dependencies. | ERROR |
+| **R5** | `domain → infra` — A domain entity or repository interface imports from `src/infra/`. The domain must be infrastructure-free. | CRITICAL |
+| **R6** | `domain → platform` — A domain file imports from `src/platform/`. Domain must depend on nothing external. | CRITICAL |
+| **R7** | `infra → feature` — An infrastructure file imports from a feature. Infra implements ports; it must not reach back into features. | WARNING |
+| **R8** | Cross-feature direct imports — A file in `src/features/A/` imports directly from `src/features/B/`. Inter-feature coupling must go through shared interfaces or event bus. | ERROR |
+| **R9** | Dependency cycles — A circular dependency exists between any two or more nodes in the architecture graph. | ERROR |
+
+  </Tab>
+  <Tab title="Import Convention Rules (R10–R13)">
+
+| Rule | Description | Severity |
+|---|---|---|
+| **R10** | Bare specifiers in local imports — A local import does not start with `./` or `../`. Bare specifiers resolve against `node_modules`, not the local file system. | ERROR |
+| **R11** | `.ts` extension in imports — An import path ends with `.ts` instead of `.js`. With `moduleResolution: "nodenext"`, only `.js` extensions are valid at runtime. | ERROR |
+| **R12** | Import to `bootstrap.di.js` — A file imports from `bootstrap.di.js`, which does not exist in the current architecture. Controllers must import from `./di.js` or `@/setting/dependencies/<name>.di.js`. | CRITICAL |
+| **R12b** | `registerSingleton` with Mongoose `model()` — A DI registration uses `registerSingleton` for a Mongoose `model()` export (which returns an object, not a class). Use `container.register(..., { useValue: ... })` instead. | CRITICAL |
+| **R13** | Domain artifacts in `platform/` — A file inside `src/platform/` has a domain artifact suffix (`.entity.ts`, `.uc.ts`, `.mapper.ts`, `.port.ts`) or imports from `src/features/`. Platform is exclusively technical backbone. | CRITICAL |
+
+  </Tab>
+</Tabs>
+
+---
+
+## Import Convention Rules (R10–R12) in Practice
+
+Rules R10–R12 apply to every file Forge generates and every file it audits. They exist because Node.js ESM with `moduleResolution: "nodenext"` requires explicit, fully-resolved import paths.
+
+<CodeGroup>
+
+```typescript Correct imports ✅
+// ✅ Correct — relative path with .js extension
+import { UserEntity } from './domain/entities/User.entity.js';
+
+// ✅ Correct — going up the tree, still .js
+import { NotFoundError } from '../../shared/errors/NotFoundError.js';
+
+// ✅ Correct — path alias for cross-layer imports
+import { Tokens } from '@/platform/di/Tokens.js';
+import { IPaginatedResponse } from '@/shared/contracts/IPaginatedResponse.js';
+```
+
+```typescript R10 violation ❌
+// ❌ R10 — bare specifier (resolves against node_modules, not local src/)
+import { UserEntity } from 'domain/entities/User';
+import { IUserRepository } from 'domain/repositories/IRepo.js';
+```
+
+```typescript R11 violation ❌
+// ❌ R11 — .ts extension (invalid at runtime with nodenext moduleResolution)
+import { UserEntity } from './domain/entities/User.entity.ts';
+import { CreateUserUseCase } from './application/use-cases/CreateUser.uc.ts';
+```
+
+```typescript R12 violation ❌
+// ❌ R12 — bootstrap.di.js does not exist in this architecture
+import { userController } from '../../bootstrap.di.js';
+
+// ✅ Correct — import from the feature's own DI file
+import { userController } from './di.js';
+```
+
+</CodeGroup>
+
+### Path Aliases for Cross-Layer Imports
+
+When an import must cross a layer boundary, use a `@/` path alias instead of a long relative path:
+
+| Target Layer | Alias | Example |
+|---|---|---|
+| Platform | `@/platform/` | `@/platform/config/App.config.js` |
+| Shared | `@/shared/` | `@/shared/errors/NotFoundError.js` |
+| Infrastructure | `@/infra/` | `@/infra/mongodb/Mongo.config.js` |
+| Shared domain entities | `@/domain/` | `@/domain/entities/Task.js` |
+
+---
+
+## Inline Ignores
+
+When a specific import genuinely needs to cross a boundary (for example, during a phased migration from a legacy codebase), Forge supports inline suppression comments. Ignores are narrow by design — they apply to the next line or to specific named rules only.
+
+```typescript
+// Suppress all rules for the next line
+// forge-ignore-next-line
+import { something } from '../infra/prisma/index.js';
+
+// Suppress only R1 for the next line
+// forge-ignore: R1
+import { PrismaClient } from '../../infra/prisma/client.js';
+
+// Suppress R1 and R8 together
+// forge-ignore: R1, R8
+import { crossFeature } from '../other-feature/domain/Entity.js';
+```
+
+To audit all active ignores across the codebase:
+
+```bash
+forge quench --show-ignores
+```
+
+<Note>
+  Inline ignores hide violations from the `quench` output but they do not remove the edges from the architecture graph. The violated rules are still tracked in `ARCHITECTURE.md` with an `[ignored]` marker so the technical debt remains visible.
+</Note>
+
+---
+
+## Violation Severity
+
+Forge uses three severity levels, each with a distinct impact on the development workflow:
+
+<Tabs>
+  <Tab title="CRITICAL">
+    **Rules:** R1, R2, R5, R6, R12, R12b, R13
+
+    A CRITICAL violation represents a fundamental breach of architectural boundaries — typically an import that couples the domain to infrastructure, or platform to business logic. In **Cursor**, the `forgeSmith` preToolUse hook **denies the write operation** before the file is saved. In `forge inspect`, CRITICAL violations contribute the highest penalty to the scoring system. They must be resolved, not suppressed.
+  </Tab>
+  <Tab title="ERROR">
+    **Rules:** R3, R4, R8, R9, R10, R11
+
+    An ERROR violation represents a boundary violation or convention failure that, while not immediately catastrophic, will accumulate into structural decay. ERRORs are reported in every `quench` run and penalize the **Layers** and **Import Conventions** categories in `inspect`. They are not blocked pre-write but appear prominently in the audit output.
+  </Tab>
+  <Tab title="WARNING">
+    **Rules:** R7
+
+    A WARNING indicates a suspicious pattern — often a design smell rather than a hard boundary violation. Warnings are visible in `quench` output and the `inspect` report, but they carry a lower scoring penalty. Some warnings (like missing `@injectable()` decorators) can be auto-corrected.
+  </Tab>
+</Tabs>
+
+---
+
+<Tip>
+  Run `forge quench --fix` to automatically correct WARNING and INFO violations — including missing `@injectable()` and `@inject()` decorators, incorrect `tsconfig.json` settings, naming convention violations, and stray `container.resolve()` calls inside business logic.
+</Tip>
