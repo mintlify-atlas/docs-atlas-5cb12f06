@@ -1,7 +1,7 @@
 ---
 title: "relocate and reforge — Migrate and Refactor Architecture"
 sidebarTitle: "Migrate & Refactor"
-description: "relocate moves legacy code to the correct architectural layer. reforge restructures features and components to resolve violations, extract use cases, and fix dependency cycles."
+description: "relocate surgically moves code to the right layer; reforge performs a full multi-layer restructure to resolve violations and extract business logic."
 ---
 
 Real-world backends rarely start clean. Codebases accumulate years of legacy structure — controllers next to database clients, utilities mixed with business logic, configuration scattered across ad-hoc directories. `relocate` and `reforge` are Forge's two migration and refactoring commands: `relocate` surgically moves existing code from a legacy location to its correct architectural layer, while `reforge` performs a broader restructuring that resolves violations, extracts use cases from controllers, fixes cyclic dependencies, and brings a project fully into compliance with Forge's four-layer model.
@@ -92,14 +92,6 @@ forge reforge
 - **Resolves cyclic dependencies** (R9) and any other active R1–R9 violations
 - **Migrates code between layers** when a component has been placed in the wrong domain
 - **Auto-fixes naming violations** (with user confirmation): renames files to match `<PascalCase>.<artefact>.ts` conventions and updates all imports
-
-### reforge Flags
-
-| Flag | Effect |
-|------|--------|
-| `--dry-run` | Preview all naming violations without making any changes |
-| `--fix-naming` | Correct naming violations automatically without prompting |
-| `--skip-naming` | Skip naming detection and correction entirely |
 
 ### Post-reforge Steps
 

@@ -1,7 +1,7 @@
 ---
 title: "temper — Harden Dependency Injection Across Your Project"
 sidebarTitle: "temper"
-description: "temper applies constructor injection and removes service locator patterns across your project, adding @injectable() and @inject() decorators according to your technology profile."
+description: "Apply constructor injection project-wide: adds @injectable()/@inject() for tsyringe, @Injectable() for NestJS, or wires manual DI — no service locators."
 ---
 
 Dependency Injection is the foundation of testable, loosely-coupled backend code. When classes resolve their own dependencies — by calling `container.resolve()` mid-logic, or by instantiating collaborators with `new` — they become impossible to unit-test without spinning up the full runtime, and the hidden coupling they create is invisible to static analysis and architectural audits. `forge temper` automates the remediation: it walks your project, identifies classes that violate DI discipline, and applies the correct injection pattern for your active technology profile — whether that is `tsyringe` decorators, NestJS's built-in DI system, or manual constructor injection.

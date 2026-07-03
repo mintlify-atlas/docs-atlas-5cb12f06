@@ -1,7 +1,7 @@
 ---
-title: "smelt — Extract Reusable Code to Shared Layer"
+title: "smelt — Consolidate Duplicated Code into src/shared/"
 sidebarTitle: "smelt"
-description: "smelt identifies duplicated or cross-cutting code and moves it to src/shared/ — keeping the shared layer clean: pure code only, no business logic, no infrastructure dependencies."
+description: "Consolidate duplicated types, errors, and utilities from features into src/shared/, enforcing purity: no business logic, no infrastructure dependencies."
 ---
 
 `forge smelt` extracts duplicated or cross-cutting code from your features and consolidates it in `src/shared/` — the one layer in Forge's architecture that every other layer is allowed to import from. When two or more features contain the same error class, type definition, or utility function, leaving that code in place creates hidden coupling: any change to the duplicated code must be applied in multiple places, and the risk of drift grows with every sprint. Smelting the code into `shared/` gives it a single, stable home and makes the dependency explicit and auditable.

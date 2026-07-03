@@ -1,7 +1,7 @@
 ---
 title: "Layer Responsibilities: Platform, Features, Shared, Infra"
 sidebarTitle: "Layers"
-description: "Each of Forge's four architectural layers has strict ownership rules. Learn what belongs in Platform, Features, Shared, and Infrastructure and why the separation matters."
+description: "Forge's four architectural layers have strict ownership rules. Learn what belongs in Platform, Features, Shared, and Infra and what each must never import."
 ---
 
 Clear layer ownership is the foundation of every Forge-modeled system. When each file knows exactly which layer it belongs to — and every layer has firm rules about what it may import — the architecture stays auditable, the domain stays clean, and new features can be added without touching existing ones. Forge enforces these boundaries automatically: the `quench` and `inspect` commands flag any file that strays outside its designated layer, naming the violated rule and its severity.
@@ -31,7 +31,7 @@ src/platform/
 
 ### What Platform Must NOT Contain
 
-Platform must never hold domain entities, use cases, business logic, or any artifact with the suffixes `.entity.ts`, `.uc.ts`, `.mapper.ts`, or `.port.ts`. It must not import from `src/features/`.
+Platform must never hold domain entities, use cases, business logic, or any artifact with the suffixes `.entity.ts`, `.uc.ts`, `.mapper.ts`, `.port.ts`, or `.repository.ts`. It must not import from `src/features/`.
 
 | Violation | Rule | Severity |
 |---|---|---|
@@ -39,7 +39,7 @@ Platform must never hold domain entities, use cases, business logic, or any arti
 | Platform imports from a feature | R2 | CRITICAL |
 
 <Warning>
-  **Platform is exclusively technical backbone.** Domain artifacts (`.entity.ts`, `.uc.ts`, `.mapper.ts`, `.port.ts`) inside `platform/` trigger R13 CRITICAL. Any import from `src/features/` triggers R2 CRITICAL. Both violations contaminate the backbone with business logic and are blocked by `forgeSmith` in Cursor before the file is written.
+  **Platform is exclusively technical backbone.** Domain artifacts (`.entity.ts`, `.uc.ts`, `.mapper.ts`, `.port.ts`, `.repository.ts`) inside `platform/` trigger R13 CRITICAL. Any import from `src/features/` triggers R2 CRITICAL. Both violations contaminate the backbone with business logic and are blocked by `forgeSmith` in Cursor before the file is written.
 </Warning>
 
 ### Platform Code Example

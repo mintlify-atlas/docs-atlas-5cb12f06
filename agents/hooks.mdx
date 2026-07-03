@@ -1,7 +1,7 @@
 ---
-title: "forgeSentinel and forgeSmith: Real-Time Architecture Enforcement"
+title: "forgeSentinel and forgeSmith: Architecture Enforcement"
 sidebarTitle: "Hooks"
-description: "forgeSentinel (PostToolUse) reports architectural violations after each file write. forgeSmith (preToolUse) actively denies writes that introduce CRITICAL or ERROR violations in Cursor."
+description: "forgeSentinel reports violations after each file write. forgeSmith gates writes before they land, denying CRITICAL or ERROR violations in Cursor."
 ---
 
 Forge provides two runtime hooks that bring architecture enforcement directly into your AI agent's edit loop. **forgeSentinel** is a non-blocking reporter: it fires after a file has been written and surfaces any new violations as a reminder, letting the agent correct them in the next step. **forgeSmith** is a write gate: it fires before a file is written and can outright **deny** the operation if the proposed content introduces a CRITICAL or ERROR violation. The two hooks cover different agents and different points in the write lifecycle, but they share the same underlying detection logic, guaranteeing consistent results everywhere.
@@ -58,7 +58,7 @@ All forgeSentinel adapters delegate to `forgeSentinel-lib.mjs`, which contains t
 
 | Function | Rules Checked |
 |----------|---------------|
-| `checkLayerViolations()` | R1-R9 — layer dependency rules |
+| `checkLayers()` | R1-R9 — layer dependency rules |
 | `checkImportConventions()` | R10-R12 — import format conventions |
 | `checkPlatformForDomain()` | R13 — domain artifacts inside platform/ |
 

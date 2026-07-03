@@ -1,7 +1,7 @@
 ---
 title: "forge — Initialize and Boot Your Architecture Project"
-sidebarTitle: "forge"
-description: "The forge command runs the mandatory boot sequence: detects your stack, bootstraps platform/shared/infra layers, analyzes ownership, and generates ARCHITECTURE.md."
+sidebarTitle: "Initialize"
+description: "The forge command bootstraps platform/shared/infra layers, runs the mandatory 9-step boot sequence, analyzes ownership, and generates ARCHITECTURE.md."
 ---
 
 `forge` is the entry point for every Forge-managed project. It detects your technology stack, bootstraps the mandatory four-layer architecture (`platform/`, `features/`, `shared/`, `infra/`) if those layers don't yet exist, analyzes component ownership, builds the architecture graph, and generates your living `ARCHITECTURE.md`. Run it on a brand-new project to establish the architecture baseline, or on an existing project to re-synchronize Forge's understanding of the codebase after manual changes or a fresh clone.
@@ -46,7 +46,7 @@ context → armorer → profile → graph → chain → inspect → architecture
     `profile.mjs` takes the detected stack and matches it against one of Forge's **10 pre-built technology profiles**. If no exact match is found, a generic profile is synthesized. The active profile drives scaffolding templates, DI patterns, ORM conventions, and naming rules for every subsequent operation.
   </Step>
   <Step title="graph — Build the architecture graph">
-    `graph.mjs` constructs the architecture graph with **6 node types** (`platform`, `feature`, `shared`, `infra`, `domain`, `adapter`) and evaluates **13 architectural rules (R1–R13)**. The output includes a **risk score** and overall dependency health.
+    `graph.mjs` constructs the architecture graph with **6 node types** (`platform`, `feature`, `shared`, `infra`, `domain`, `adapter`) and evaluates **9 architectural rules (R1–R9)**. The output includes a **risk score** and overall dependency health.
   </Step>
   <Step title="chain — Multi-layer dependency analysis">
     `chain.mjs` builds the full dependency graph across all four layers, computes a **topological sort** (build order), detects **global dependency cycles**, and identifies **illegal dependency chains** — sequences of individually valid edges that together violate architectural intent.
@@ -72,7 +72,7 @@ The full boot sequence as a reference table:
 | 1 | `context.mjs` | Detects stack, platform, features, shared, infra, project state |
 | 2 | `armorer.mjs` | Ownership: orphans, duplicates, misplaced components |
 | 3 | `profile.mjs` | Matches stack to one of 10 pre-built profiles or synthesizes generic |
-| 4 | `graph.mjs` | Builds architecture graph: 6 node types, 13 rules (R1–R13), risk score |
+| 4 | `graph.mjs` | Builds architecture graph: 6 node types, 9 rules (R1–R9), risk score |
 | 5 | `chain.mjs` | Multi-layer dependency graph with topological sort |
 | 6 | `inspect.mjs` | Full architecture audit (180 pts → 0–100, grade A–F) |
 | 7 | `architecture.mjs` | Generates/updates `ARCHITECTURE.md` |

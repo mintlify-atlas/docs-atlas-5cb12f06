@@ -1,5 +1,5 @@
 ---
-title: "Get Started with Forge in Under 5 Minutes"
+title: "Forge Quickstart: From Install to First Audit in 5 Minutes"
 sidebarTitle: "Quickstart"
 description: "Initialize Forge on a backend project, run your first architecture audit, scaffold a feature slice, and enforce dependency rules in five steps."
 ---
@@ -48,7 +48,9 @@ By the end of this guide you will have: Forge installed in your AI agent, your b
     - **graph** — builds the architecture graph: all nodes (platform, feature, shared, infra, domain, adapter), all directed dependency edges, and all rule violations
     - **chain** — constructs the multi-layer dependency graph with topological sort and cycle detection
     - **inspect** — runs the full audit and computes the 0–100 architecture score
-    - **architecture** — generates or updates `ARCHITECTURE.md` with the current state
+    - **architecture** — generates or updates `ARCHITECTURE.md` with the pre-command project state
+    - **execute** — runs the user's requested command (e.g. `cast`, `quench`, `inscribe`, or any other operation) with full architectural context loaded
+    - **architecture** — regenerates `ARCHITECTURE.md` after the command completes, reflecting any changes made during execution
 
     If `src/platform/`, `src/shared/`, or `src/infra/` are missing, Forge bootstraps them automatically using templates for the detected profile.
   </Step>

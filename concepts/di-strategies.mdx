@@ -1,7 +1,7 @@
 ---
 title: "Dependency Injection Strategies by Technology Profile"
 sidebarTitle: "DI Strategies"
-description: "Forge supports three dependency injection strategies — tsyringe decorator-based, NestJS built-in DI, and manual constructor injection — selected automatically by your technology profile."
+description: "Forge selects one of three DI strategies — tsyringe, NestJS built-in DI, or manual constructor injection — based on your detected technology profile."
 ---
 
 Dependency injection is the mechanism that makes Hexagonal Architecture testable. Without it, use cases would construct their own repositories, controllers would reach directly for ORM clients, and the domain would become tangled with infrastructure. Forge enforces **constructor injection** as the universal pattern — no service locators, no `container.resolve()` inside business logic, no singleton globals. The specific container (or lack of one) varies by technology profile, but the principle is always the same: dependencies flow in through the constructor, declared as interfaces, with concrete implementations wired at the composition root. Forge auto-selects the strategy that fits your detected profile so `cast`, `temper`, and `inspect` all generate and validate the correct annotations for your stack.
@@ -12,7 +12,7 @@ Dependency injection is the mechanism that makes Hexagonal Architecture testable
 
 tsyringe is the DI container used by Express and mixed Fastify profiles. It uses TypeScript decorators (`@injectable()`, `@inject()`) on classes and a per-feature `di.ts` file as the composition root for that slice.
 
-**Profiles using tsyringe**: `express-mongodb`, `express-prisma`, `express-drizzle`, `fastify-prisma`
+**Profiles using tsyringe**: `express-mongodb`, `express-prisma`, `express-drizzle`
 
 ### Token Pattern
 
@@ -148,7 +148,7 @@ export class UserPersistenceModule {}
 
 Some profiles — particularly smaller Express and Fastify stacks — use no DI container at all. Dependencies are passed explicitly through constructors, wired at the composition root (the routes file or the application entry point).
 
-**Profiles using manual injection**: `express-postgres`, `fastify-mongodb`, `fastify-postgres`
+**Profiles using manual injection**: `express-postgres`, `fastify-mongodb`, `fastify-postgres`, `fastify-prisma`
 
 ### Wiring at the Routes Level
 

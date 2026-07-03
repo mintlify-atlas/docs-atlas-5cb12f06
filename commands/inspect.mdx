@@ -1,7 +1,7 @@
 ---
 title: "inspect — Full Architecture Audit with 0–100 Score"
-sidebarTitle: "inspect"
-description: "inspect evaluates your project across 10 categories (180 total points) and returns a normalized 0–100 score with an A–F grade, identifying violations by severity."
+sidebarTitle: "Inspect"
+description: "inspect scores your project across 10 categories (180 pts) and returns a 0–100 grade from A to F, listing every violation by severity and category."
 ---
 
 `inspect` is Forge's full architecture auditor. It evaluates the entire project against **180 points spread across 10 categories** — structure, layer isolation, DI decorators, ownership, platform completeness, dependency direction, graph health, naming conventions, import rules, and custom project rules — then normalizes the result to a **0–100 score with an A–F grade**. Every violation is reported with a severity level so you know exactly what to fix and in what order. Run `inspect` before pull requests, after major structural changes, or any time you need a definitive picture of your architecture's health.
@@ -39,7 +39,7 @@ node .opencode/skills/forge/scripts/inspect.mjs --json
 | Ownership | 20 | Orphans (components without a clear owner), duplicates (same artifact in multiple places), misplaced components (files in the wrong layer) |
 | Platform | 15 | Technical backbone completeness — config, server, logger, database, DI, and other platform components expected by the active profile |
 | Dependencies | 15 | Dependency direction (allowed vs. prohibited edges), cycles, and invalid graph edges |
-| Graph | 20 | Architecture graph health: risk score, dependency health percentage, and rule violations (R1–R13) |
+| Graph | 20 | Architecture graph health: risk score, dependency health percentage, and rule violations (R1–R9) |
 | Custom Rules | 5 | Rules defined in `.forge/rules.json` for project-specific architectural constraints |
 | Naming | 10 | PascalCase artifact names, kebab-case directories, correct suffixes (`.entity.ts`, `.uc.ts`, `.repository.ts`, etc.) |
 | Import Conventions | 20 | R10 (no bare specifiers), R11 (`.js` extension in imports), R12 (no `bootstrap.di.js` imports) |
@@ -50,10 +50,10 @@ node .opencode/skills/forge/scripts/inspect.mjs --json
 | Grade | Score Range | Meaning |
 |-------|-------------|---------|
 | **A** | 90–100 | Solid architecture. All principles upheld. |
-| **B** | 75–89 | Minor inconsistencies. Easy to correct. |
-| **C** | 60–74 | Several violations. Requires structured work. |
-| **D** | 45–59 | Architecture compromised. Migration needed. |
-| **F** | < 45 | Project not yet migrated or widespread violations. |
+| **B** | 80–89 | Minor inconsistencies. Easy to correct. |
+| **C** | 65–79 | Several violations. Requires structured work. |
+| **D** | 50–64 | Architecture compromised. Migration needed. |
+| **F** | < 50 | Project not yet migrated or widespread violations. |
 
 ## Reading the Output
 

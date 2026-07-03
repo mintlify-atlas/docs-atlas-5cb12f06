@@ -1,7 +1,7 @@
 ---
-title: "quench — Validate 13 Architectural Rules"
-sidebarTitle: "quench"
-description: "quench runs all 13 architectural dependency rules (R1–R13) and reports violations with severity. Use --fix to auto-correct WARNING-level issues."
+title: "quench — Validate All 13 Architectural Dependency Rules"
+sidebarTitle: "Quench"
+description: "quench checks all 13 architectural rules (R1–R13) and reports violations by severity. Use --fix to auto-correct WARNING/INFO-level issues."
 ---
 
 `quench` is Forge's rule validator. It runs all **13 architectural dependency rules (R1–R13)** against your codebase and reports every violation with its severity level. Unlike `inspect` — which produces a full scored report across 10 categories — `quench` is focused and fast, designed to run after every meaningful change to guarantee the rule baseline is clean. Use it in CI pipelines, as a pre-commit check, or immediately after `cast`, `reforge`, or any manual refactoring to confirm the architectural constraints are still intact.

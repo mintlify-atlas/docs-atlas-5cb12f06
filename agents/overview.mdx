@@ -1,7 +1,7 @@
 ---
 title: "Forge as an AI Agent Skill: Multi-Agent Architecture"
 sidebarTitle: "Overview"
-description: "Forge deploys as a skill into five AI coding agents simultaneously — OpenCode, Claude Code, Cursor, Codex CLI, and Gemini — with hooks tailored to each platform's extension model."
+description: "Forge deploys as a skill into five AI agents — OpenCode, Claude Code, Cursor, Codex CLI, and Gemini — each with hooks tuned to its extension model."
 ---
 
 Forge is not a plugin or extension in the traditional sense — it is a **skill**: a self-contained intelligence bundle installed directly into an AI agent's configuration directory. When an agent starts a session, it loads the Forge SKILL.md as part of its system context, giving it architecture instructions, command routing, boot sequences, and runtime enforcement hooks. Each supported agent receives a copy of the full skill (scripts, profiles, reference docs, and templates), customized with agent-specific paths so every script invocation resolves correctly at runtime.

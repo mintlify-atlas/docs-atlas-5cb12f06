@@ -1,7 +1,7 @@
 ---
 title: "Architecture Model: Four-Layer Backend System Design"
 sidebarTitle: "Overview"
-description: "Forge models every backend system across four mandatory architectural domains: Platform, Features, Shared, and Infrastructure — with an architecture graph as the source of truth."
+description: "Forge models backends in four mandatory domains — Platform, Features, Shared, and Infra — with the architecture graph as the single source of truth."
 ---
 
 Forge treats every backend system as a graph of typed components organized across four mandatory architectural domains. Rather than layering code by technical concern alone, Forge enforces **ownership** at the domain boundary: each module knows exactly where it lives, what it may import, and what may import it. The result is a system that can be audited, scored, and evolved without guesswork — because the architecture graph, not a wiki page, is the source of truth.

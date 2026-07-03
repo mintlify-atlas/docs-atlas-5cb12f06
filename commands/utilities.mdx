@@ -36,20 +36,6 @@ forge hook check      # Manually validate staged files right now
 forge hook uninstall  # Remove the hook
 ```
 
-**Additional hook management:**
-
-```bash
-forge hook ignore R1          # Suppress a specific rule in the hook
-forge hook unignore R1        # Re-enable a previously ignored rule
-forge hook list-ignored       # List all rules currently ignored by the hook
-```
-
-Ignored rules are persisted to `.forge/hooks-ignore.json`:
-
-```json
-{ "ignored": ["R1", "R7"] }
-```
-
 <Note>
   The hook blocks commits but does **not** prevent bypassing with `git commit --no-verify`. Use `forge hook status` regularly to confirm the hook is still installed — particularly after cloning on a new machine, since git hooks are not versioned.
 </Note>
@@ -59,7 +45,7 @@ Ignored rules are persisted to `.forge/hooks-ignore.json`:
 | File | Purpose |
 |------|---------|
 | `.git/hooks/pre-commit` | The hook script itself |
-| `.forge/hooks-ignore.json` | List of rules the hook should not block on |
+| `.forge/hooks-ignore.json` | Rules suppressed via inline `forge-ignore` comments |
 
 </Accordion>
 

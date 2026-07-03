@@ -1,7 +1,7 @@
 ---
 title: "Dependency Rules R1–R13: Enforced Architecture Boundaries"
 sidebarTitle: "Dependency Rules"
-description: "Forge enforces 13 architectural dependency rules (R1–R13) with CRITICAL, ERROR, and WARNING severity. Learn which imports are permitted, which are prohibited, and how violations are detected."
+description: "Forge enforces 13 dependency rules (R1–R13) at CRITICAL, ERROR, and WARNING severity, covering layer boundaries, import conventions, and inline ignores."
 ---
 
 Forge's dependency rule system turns architectural intent into automated enforcement. Every import in your codebase is an edge in the architecture graph. During each operation, the `quench` command validates all 13 rules (R1–R13) against every edge, assigning a severity to each violation. This happens automatically — you do not need to configure anything or write custom lint rules. Violations appear in the `quench` output with file path, line number, violated rule, and severity, and they feed directly into the **Layers** (25 pts) and **Import Conventions** (20 pts) categories of `forge inspect`.
@@ -46,16 +46,16 @@ These import directions are explicitly permitted by the architecture model:
 | **R11** | `.ts` extension in imports — An import path ends with `.ts` instead of `.js`. With `moduleResolution: "nodenext"`, only `.js` extensions are valid at runtime. | ERROR |
 | **R12** | Import to `bootstrap.di.js` — A file imports from `bootstrap.di.js`, which does not exist in the current architecture. Controllers must import from `./di.js` or `@/setting/dependencies/<name>.di.js`. | CRITICAL |
 | **R12b** | `registerSingleton` with Mongoose `model()` — A DI registration uses `registerSingleton` for a Mongoose `model()` export (which returns an object, not a class). Use `container.register(..., { useValue: ... })` instead. | CRITICAL |
-| **R13** | Domain artifacts in `platform/` — A file inside `src/platform/` has a domain artifact suffix (`.entity.ts`, `.uc.ts`, `.mapper.ts`, `.port.ts`) or imports from `src/features/`. Platform is exclusively technical backbone. | CRITICAL |
+| **R13** | Domain artifacts in `platform/` — A file inside `src/platform/` has a domain artifact suffix (`.entity.ts`, `.uc.ts`, `.mapper.ts`, `.port.ts`, `.repository.ts`) or imports from `src/features/`. Platform is exclusively technical backbone. | CRITICAL |
 
   </Tab>
 </Tabs>
 
 ---
 
-## Import Convention Rules (R10–R12) in Practice
+## Import Convention Rules (R10–R13) in Practice
 
-Rules R10–R12 apply to every file Forge generates and every file it audits. They exist because Node.js ESM with `moduleResolution: "nodenext"` requires explicit, fully-resolved import paths.
+Rules R10–R13 apply to every file Forge generates and every file it audits. R10–R12 exist because Node.js ESM with `moduleResolution: "nodenext"` requires explicit, fully-resolved import paths. R12b and R13 guard against DI wiring mistakes and domain artifacts leaking into platform.
 
 <CodeGroup>
 
@@ -89,6 +89,15 @@ import { userController } from '../../bootstrap.di.js';
 
 // ✅ Correct — import from the feature's own DI file
 import { userController } from './di.js';
+```
+
+```typescript R12b violation ❌
+// ❌ R12b — registerSingleton with Mongoose model() returns an object, not a class
+import { UserModel } from './User.schema.js';
+container.registerSingleton(Tokens.UserModel, UserModel);
+
+// ✅ Correct — use register with useValue for Mongoose model() exports
+container.register(Tokens.UserModel, { useValue: UserModel });
 ```
 
 </CodeGroup>

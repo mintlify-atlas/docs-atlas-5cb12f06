@@ -1,7 +1,7 @@
 ---
 title: "Forge: Architecture Operating System for Backend Systems"
 sidebarTitle: "Introduction"
-description: "Forge is an architecture governance CLI and AI agent skill that enforces Hexagonal Architecture, Pragmatic DDD, and Vertical Slices — with automated auditing, scaffolding, and rule enforcement across 13 dependency rules."
+description: "Architecture governance CLI and AI agent skill that models, audits, and enforces backend structure with 13 dependency rules and automatic scaffolding."
 ---
 
 Forge is an **architecture operating system** for backend systems. It models, builds, audits, protects, and evolves complete backend projects across four mandatory architectural domains — Platform, Features, Shared, and Infrastructure. Unlike a boilerplate template or a style guide, Forge is an active orchestrator: it detects your technology stack, bootstraps the correct layer structure, validates dependency rules on every file write, and maintains a living `ARCHITECTURE.md` that reflects the real state of your codebase at all times. It ships as an npm package (`@ronaldjdevfs/forge`) and integrates directly into your AI agent as a **skill**, so architectural governance happens automatically in every coding session.
@@ -89,7 +89,7 @@ Forge integrates with five AI coding agents. The integration model varies by age
 | **Codex CLI** | `--codex` | `.agents/skills/forge/` | `forgeSentinel` | PostToolUse |
 | **Gemini** | `--gemini` | `.gemini/skills/forge/` | — | Via SKILL.md |
 
-All hooks share the same violation-detection logic through `forgeSentinel-lib.mjs`, so rule enforcement is consistent across every agent.
+The hook-based agents (Claude Code, Cursor, Codex CLI) share the same violation-detection logic through `forgeSentinel-lib.mjs`, so rule enforcement is identical across all three.
 
 <Tip>
   You can install Forge for multiple agents simultaneously with `npx @ronaldjdevfs/forge install --all`, or run the interactive wizard with `npx @ronaldjdevfs/forge install` to choose agents individually.

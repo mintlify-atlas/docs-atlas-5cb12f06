@@ -1,7 +1,7 @@
 ---
-title: "assay — Multi-Persona Architecture Review"
+title: "assay — Qualitative Multi-Persona Architecture Review"
 sidebarTitle: "assay"
-description: "assay evaluates your architecture from five distinct expert perspectives: Jeff Bezos, Martin Fowler, a Security Hacker, a Product Manager, and a senior Architect."
+description: "Get qualitative analysis from five expert personas — Bezos, Fowler, Hacker, PM, and Dr. Carter — grounded in your latest forge inspect audit results."
 ---
 
 `forge assay` produces a qualitative, multi-perspective architectural essay on top of the quantitative data from `forge inspect`. Instead of a single point of view, it convenes five simulated expert personas — each with a different professional lens — and asks every one of them to weigh in on your codebase simultaneously. The result is a richer, more actionable diagnosis than any single audit score can give you: you learn not just *what* is wrong, but *why it matters* from a scalability standpoint, a technical-debt standpoint, a security standpoint, a product standpoint, and a governance standpoint — all at once.
@@ -9,6 +9,8 @@ description: "assay evaluates your architecture from five distinct expert perspe
 ## Usage
 
 ```bash
+# Via agent natural language: "examinar", "calidad", "opinión", "critique"
+# Direct invocation:
 forge assay                     # Full review (all 5 personas)
 forge assay --persona=bezos     # Only Bezos perspective
 forge assay --persona=fowler    # Only Fowler perspective
@@ -54,11 +56,7 @@ Each persona targets a distinct area of architectural concern. Running the full 
 When you pass `--save`, Forge writes the full report to `.forge/assay/` using a timestamped filename (e.g. `assay-2026-06-25T00-00-00.md`). Results accumulate over time, so you can track how each persona's assessment evolves across sprints or refactoring cycles.
 
 ```bash
-forge assay --save              # Saves current assay
-
-# Later, review history
-forge assay history             # List saved assays
-forge assay read assay-2026-06-25T00-00-00.md  # Read a specific saved report
+forge assay --save              # Saves current assay to .forge/assay/
 ```
 
 The `.forge/assay/` directory acts as a lightweight architectural journal. Before major decisions — migrating to microservices, introducing a new feature boundary, upgrading an ORM — run `assay --save` so you have a recorded baseline to compare against after the change.

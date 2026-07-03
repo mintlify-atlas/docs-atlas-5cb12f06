@@ -1,7 +1,7 @@
 ---
-title: "Code Patterns: Entities, Use Cases, Repositories, and Adapters"
+title: "Code Patterns for Forge Artifact Types and Imports"
 sidebarTitle: "Patterns"
-description: "Learn the canonical code patterns for every Forge artifact type — entities, use cases, repository interfaces, error types, events, HTTP adapters, and persistence adapters."
+description: "Canonical code patterns for every Forge artifact — entities, use cases, repository interfaces, domain errors, HTTP controllers, and persistence adapters."
 ---
 
 Forge enforces specific, consistent code patterns for every artifact it generates. This consistency is not stylistic preference — it is what makes automated analysis possible. When `inspect` checks Decorators, it knows exactly where `@injectable()` should appear. When `forgeSentinel` analyzes a modified file, it knows the canonical import path structure. When `quench` reports an R8 cross-feature violation, it has a reliable way to identify which layer a file belongs to. The patterns below are the ground truth for every file Forge generates via `cast`, and the baseline that `inspect`, `quench`, and the runtime hooks measure against.

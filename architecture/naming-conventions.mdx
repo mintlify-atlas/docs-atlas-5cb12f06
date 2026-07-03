@@ -1,7 +1,7 @@
 ---
 title: "Naming Conventions for Files, Classes, and Interfaces"
 sidebarTitle: "Naming"
-description: "Forge enforces consistent naming across directories, files, classes, interfaces, use cases, and more. Learn the exact patterns for each artifact type in your backend system."
+description: "Forge enforces file and artifact naming conventions — every suffix is a machine-readable signal powering ownership detection and R13 violation checks."
 ---
 
 Consistent naming is not cosmetic in a Forge-governed system — it is functional. The `armorer` module identifies ownership by scanning file suffixes and directory paths. The `inspect` audit uses suffixes to detect orphaned components, misplaced domain artifacts, and R13 violations (domain files in `platform/`). The `quench` validator checks naming conventions as a dedicated scoring category. If a file is named incorrectly, Forge cannot classify it, and an unclassified file is treated as an orphan in the ownership report. Every name in a Forge project is a machine-readable signal.
@@ -52,7 +52,7 @@ These suffixes are the vocabulary Forge uses to classify every file in your proj
 | `.config.ts` | Configuration module | `platform/config/` |
 
 <Note>
-  The `armorer` step in the boot sequence and the `inspect` command both rely on these suffixes to detect ownership violations. A `.entity.ts` file inside `src/platform/` triggers R13 CRITICAL regardless of its contents. A `.uc.ts` file outside of a `features/` directory is flagged as a misplaced component.
+  The `armorer` step in the boot sequence and the `inspect` command both rely on these suffixes to detect ownership violations. Any file with a `.entity.ts`, `.uc.ts`, `.mapper.ts`, `.port.ts`, or `.repository.ts` suffix inside `src/platform/` triggers R13 CRITICAL regardless of its contents. A `.uc.ts` file outside of a `features/` directory is flagged as a misplaced component.
 </Note>
 
 ### Interface and Port Naming
